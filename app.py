@@ -26,7 +26,7 @@ def get_companies():
         
         # Get data from the first table found
         table_name = tables[0]['name']
-        cursor.execute(f"SELECT Ticker, Name, Sector, Sub_Sector FROM {table_name} LIMIT 100")
+        cursor.execute(f"SELECT Ticker, Name, Sector, Sub_Sector FROM {table_name}")
         companies = cursor.fetchall()
         
         # Convert to list of dictionaries with specific column order
@@ -100,7 +100,7 @@ def filter_companies():
             query += " AND Sub_Sector = ?"
             params.append(sub_sector)
         
-        query += " ORDER BY Name LIMIT 100"
+        query += " ORDER BY Name"
         
         cursor.execute(query, params)
         results = cursor.fetchall()
@@ -148,7 +148,7 @@ def search_companies():
         column_names = [col['name'] for col in columns]
         
         # Build search query with specific columns
-        search_query = f"SELECT Ticker, Name, Sector, Sub_Sector FROM {table_name} WHERE LOWER(Ticker) LIKE ? OR LOWER(Name) LIKE ? OR LOWER(Sector) LIKE ? OR LOWER(Sub_Sector) LIKE ? LIMIT 50"
+        search_query = f"SELECT Ticker, Name, Sector, Sub_Sector FROM {table_name} WHERE LOWER(Ticker) LIKE ? OR LOWER(Name) LIKE ? OR LOWER(Sector) LIKE ? OR LOWER(Sub_Sector) LIKE ?"
         search_params = [f'%{query}%'] * 4
         
         cursor.execute(search_query, search_params)
