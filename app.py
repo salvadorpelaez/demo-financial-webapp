@@ -175,6 +175,108 @@ def search_companies():
     finally:
         conn.close()
 
+@app.route('/api/columns')
+def get_columns():
+    """Get available column classifications"""
+    # Use the database that has the Classification column
+    db_path = r"c:\Users\salva\OneDrive\Desktop\AI financial company\S&P500_Master.db"
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        cursor = conn.cursor()
+        
+        # First, let's debug what's actually in the database
+        cursor.execute("SELECT Classification, COUNT(*) as count FROM Companies GROUP BY Classification ORDER BY count DESC LIMIT 10")
+        debug_results = cursor.fetchall()
+        print("DEBUG - Classification data in database:")
+        for result in debug_results:
+            val = result['Classification'] if result['Classification'] else 'NULL'
+            print(f"  '{val}': {result['count']} companies")
+        
+        # Try multiple approaches to get classification data
+        classification_list = []
+        
+        # Method 1: Standard query
+        cursor.execute("SELECT DISTINCT Classification FROM Companies WHERE Classification IS NOT NULL AND Classification != '' ORDER BY Classification")
+        classifications = cursor.fetchall()
+        print(f"DEBUG - Method 1 found {len(classifications)} results")
+        
+        for cls in classifications:
+            if cls['Classification'] and cls['Classification'].strip():
+                classification_list.append({
+                    'value': cls['Classification'].strip(),
+                    'label': cls['Classification'].strip()
+                })
+        
+        # Method 2: If no results, try without empty string check
+        if not classification_list:
+            cursor.execute("SELECT DISTINCT Classification FROM Companies WHERE Classification IS NOT NULL ORDER BY Classification")
+            classifications = cursor.fetchall()
+            print(f"DEBUG - Method 2 found {len(classifications)} results")
+            
+            for cls in classifications:
+                if cls['Classification'] and cls['Classification'].strip() and cls['Classification'].strip() != 'None':
+                    classification_list.append({
+                        'value': cls['Classification'].strip(),
+                        'label': cls['Classification'].strip()
+                    })
+        
+        # Method 3: If still no results, try getting all non-null values
+        if not classification_list:
+            cursor.execute("SELECT Classification FROM Companies")
+            all_values = cursor.fetchall()
+            print(f"DEBUG - Method 3 found {len(all_values)} total values")
+            
+            unique_values = set()
+            for row in all_values:
+                val = row['Classification']
+                if val and val.strip() and val.strip() != 'None':
+                    unique_values.add(val.strip())
+            
+            for val in sorted(unique_values):
+                classification_list.append({
+                    'value': val,
+                    'label': val
+                })
+        
+        # TEMPORARY: Add hardcoded values for testing
+        if not classification_list:
+            print("DEBUG - Adding hardcoded test values")
+            classification_list = [
+                {'value': 'Value', 'label': 'Value'},
+                {'value': 'Borderline', 'label': 'Borderline'},
+                {'value': 'Hypergrowth', 'label': 'Hypergrowth'},
+                {'value': 'Flag', 'label': 'Flag'}
+            ]
+        
+        print(f"DEBUG - Final classification list: {[c['value'] for c in classification_list]}")
+        
+        # If we found classifications, return them
+        if classification_list:
+            return jsonify({'columns': classification_list})
+        else:
+            # Fallback to default columns if no classification data found
+            columns = [
+                {'value': 'ticker', 'label': 'Ticker'},
+                {'value': 'name', 'label': 'Name'},
+                {'value': 'sector', 'label': 'Sector'},
+                {'value': 'sub_sector', 'label': 'Sub Sector'}
+            ]
+            return jsonify({'columns': columns})
+            
+    except Exception as e:
+        print(f"Error in /api/columns: {e}")
+        # Fallback on error - include hardcoded values
+        classification_list = [
+            {'value': 'Value', 'label': 'Value'},
+            {'value': 'Borderline', 'label': 'Borderline'},
+            {'value': 'Hypergrowth', 'label': 'Hypergrowth'},
+            {'value': 'Flag', 'label': 'Flag'}
+        ]
+        return jsonify({'columns': classification_list})
+    finally:
+        conn.close()
+
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     return send_from_directory('static', filename)

@@ -379,6 +379,12 @@
                             <option value="">All Sub Sectors</option>
                         </select>
                     </div>
+                    <div class="filter-group">
+                        <label class="filter-label">Classification:</label>
+                        <select id="columnSelect" class="filter-select">
+                            <option value="">All Classifications</option>
+                        </select>
+                    </div>
                     <button onclick="filterBySector()" class="search-btn">Apply Filter</button>
                     <button onclick="loadCompanies()" class="search-btn">Reset</button>
                 </div>
@@ -606,6 +612,27 @@
             } else if (tab === 'sector') {
                 document.getElementById('sectorFilter').classList.add('active');
                 loadSectors();
+                loadColumns();
+            }
+        }
+
+        // Load columns for dropdown
+        async function loadColumns() {
+            try {
+                const response = await fetch('/api/columns');
+                const data = await response.json();
+                
+                const columnSelect = document.getElementById('columnSelect');
+                columnSelect.innerHTML = '<option value="">All Classifications</option>';
+                
+                data.columns.forEach(column => {
+                    const option = document.createElement('option');
+                    option.value = column.value;
+                    option.textContent = column.label;
+                    columnSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error loading columns:', error);
             }
         }
 
@@ -653,12 +680,13 @@
             }
         }
 
-        // Filter by sector and sub-sector
+        // Filter by sector and sub-sector (and column)
         async function filterBySector() {
             const sector = document.getElementById('sectorSelect').value;
             const subSector = document.getElementById('subSectorSelect').value;
+            const column = document.getElementById('columnSelect').value;
             
-            if (!sector && !subSector) {
+            if (!sector && !subSector && !column) {
                 loadCompanies();
                 return;
             }
@@ -680,14 +708,23 @@
                     throw new Error(data.error);
                 }
 
-                currentData = data.companies;
+                let filteredCompanies = data.companies;
                 
-                if (data.companies.length === 0) {
+                // Apply column filtering if selected
+                if (column) {
+                    filteredCompanies = filteredCompanies.filter(company => {
+                        return company[column] && company[column].trim() !== '';
+                    });
+                }
+
+                currentData = filteredCompanies;
+                
+                if (filteredCompanies.length === 0) {
                     document.getElementById('noResults').style.display = 'block';
                     document.getElementById('stats').innerHTML = '';
                 } else {
-                    displayResults(data);
-                    updateFilterStats(data);
+                    displayResults({companies: filteredCompanies});
+                    updateFilterStats(filteredCompanies, {sector, sub_sector: subSector, column});
                 }
 
             } catch (error) {
@@ -697,21 +734,35 @@
             }
         }
 
-        function updateFilterStats(data) {
-            const filters = data.filters;
+        function updateFilterStats(companies, filters) {
+            const columnLabels = {
+                'ticker': 'Ticker',
+                'name': 'Name', 
+                'sector': 'Sector',
+                'sub_sector': 'Sub Sector'
+            };
+            
             let filterDescription = '';
             
-            if (filters.sector && filters.sub_sector) {
+            if (filters.sector && filters.sub_sector && filters.column) {
+                filterDescription = `${filters.sector} - ${filters.sub_sector} + ${columnLabels[filters.column]}`;
+            } else if (filters.sector && filters.sub_sector) {
                 filterDescription = `${filters.sector} - ${filters.sub_sector}`;
+            } else if (filters.sector && filters.column) {
+                filterDescription = `${filters.sector} + ${columnLabels[filters.column]}`;
+            } else if (filters.sub_sector && filters.column) {
+                filterDescription = `${filters.sub_sector} + ${columnLabels[filters.column]}`;
             } else if (filters.sector) {
                 filterDescription = filters.sector;
             } else if (filters.sub_sector) {
                 filterDescription = filters.sub_sector;
+            } else if (filters.column) {
+                filterDescription = columnLabels[filters.column];
             }
             
             const statsHtml = `
                 <div class="stat-card">
-                    <div class="stat-number">${data.total_count}</div>
+                    <div class="stat-number">${companies.length}</div>
                     <div class="stat-label">Companies Found</div>
                 </div>
                 <div class="stat-card">
