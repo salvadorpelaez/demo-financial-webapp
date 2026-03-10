@@ -60,6 +60,31 @@
             opacity: 0.9;
         }
 
+        .dropdown-container {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+
+        .dropdown-select {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.15);
+            border: 2px solid black;
+            border-radius: 6px;
+            color: black;
+            font-size: 14px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            min-width: 300px;
+        }
+
+        .dropdown-select option {
+            background: #2c3e50;
+            color: white;
+        }
+
         .logo {
             width: 40px;
             height: 40px;
@@ -156,6 +181,15 @@
                 </div>
                 <span class="logo-text">Valerious - Value Analytics Made Simple</span>
             </div>
+            <div class="dropdown-container">
+                <select id="benchmarkSelect" class="dropdown-select" onchange="handleBenchmarkChange()">
+                    <option value="">Select Benchmark</option>
+                    <option value="sp500">S&P 500: Large-Cap Core & Dividend Benchmarks</option>
+                    <option value="nasdaq100">Nasdaq-100: AI-Driven Hypergrowth & Tech Innovation</option>
+                    <option value="dowjones">Dow Jones: Ultra-Mature Blue Chips & Dividend Streaks</option>
+                    <option value="russell2000">Russell 2000: Scrappy Small-Cap Value & Hidden Gems</option>
+                </select>
+            </div>
             <div class="login-container">
                 <input type="text" id="username" class="login-input" placeholder="Username">
                 <input type="password" id="password" class="login-input" placeholder="Password">
@@ -173,6 +207,15 @@
     </div>
 
     <script>
+        // Benchmark dropdown functionality
+        function handleBenchmarkChange() {
+            const selectedValue = document.getElementById('benchmarkSelect').value;
+            if (selectedValue) {
+                alert(`Selected benchmark: ${selectedValue}`);
+                // TODO: Implement actual benchmark switching logic
+            }
+        }
+
         // Login functionality
         function handleLogin() {
             const username = document.getElementById('username').value;
