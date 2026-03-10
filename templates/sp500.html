@@ -44,6 +44,25 @@
             align-items: center;
         }
 
+        .back-btn {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .back-btn:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+        }
+
         .logo-container {
             position: absolute;
             top: 10px;
@@ -375,16 +394,10 @@
                 </div>
                 <span class="logo-text">Valerious - Value Analytics Made Simple</span>
             </div>
-            <div class="dropdown-container">
-                <select id="benchmarkSelect" class="dropdown-select" onchange="handleBenchmarkChange()">
-                    <option value="">Select Benchmark</option>
-                    <option value="sp500" selected>S&P 500: Large-Cap Core & Dividend Benchmarks</option>
-                    <option value="nasdaq100">Nasdaq-100: AI-Driven Hypergrowth & Tech Innovation</option>
-                    <option value="dowjones">Dow Jones: Ultra-Mature Blue Chips & Dividend Streaks</option>
-                    <option value="russell2000">Russell 2000: Scrappy Small-Cap Value & Hidden Gems</option>
-                </select>
+            <div class="login-container">
+                <a href="/" class="back-btn">Back to Main Page</a>
             </div>
-                        <h1>S&P 500: Large-Cap Core & Dividend Benchmarks</h1>
+            <h1>S&P 500: Large-Cap Core & Dividend Benchmarks</h1>
             </header>
 
         <section class="search-section">
@@ -458,20 +471,6 @@
 
         const TABLE_HEADERS = ['ticker', 'name', 'sector', 'sub_sector'];
         const TABLE_HEADER_NAMES = ['Ticker', 'Name', 'Sector', 'Sub Sector'];
-
-        // Benchmark dropdown functionality
-        function handleBenchmarkChange() {
-            const selectedValue = document.getElementById('benchmarkSelect').value;
-            if (selectedValue) {
-                if (selectedValue === 'sp500') {
-                    // Already on S&P 500 page
-                    return;
-                } else {
-                    alert(`Selected benchmark: ${selectedValue}`);
-                    // TODO: Implement other benchmark pages
-                }
-            }
-        }
 
         // Tab switching functionality
         function switchTab(tab) {
