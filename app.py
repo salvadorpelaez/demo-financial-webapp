@@ -5,8 +5,12 @@ import pandas as pd
 import requests
 import os
 from datetime import datetime
+from technical_indicators import indicators_bp
 
 app = Flask(__name__)
+
+# Register technical indicators blueprint
+app.register_blueprint(indicators_bp)
 
 # Add Alpha Vantage API key - Replace with your actual API key
 # Get free key from: https://www.alphavantage.co/support/#api-key
