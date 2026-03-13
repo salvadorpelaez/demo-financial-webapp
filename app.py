@@ -46,71 +46,27 @@ def get_market_data():
             ('DAX', '^GDAXI')
         ]
         
-        latest_data = {}
-        
-        # Get European indices using Alpha Vantage
-        european_symbols = ['^FCHI', '^FTSE', '^GDAXI']
-        for name, symbol in ordered_indices:
-            if symbol in european_symbols:
-                try:
-                    # Use Alpha Vantage for European indices
-                    url = f"https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol={symbol}&apikey={ALPHA_VANTAGE_API_KEY}"
-                    response = requests.get(url)
-                    
-                    if response.status_code == 200:
-                        data = response.json()
-                        if 'Global Quote' in data:
-                            quote = data['Global Quote']
-                            price = float(quote['05. price'])
-                            change = float(quote['09. change'])
-                            change_percent = float(quote['10. change percent'].replace('%', ''))
-                            
-                            latest_data[symbol] = {
-                                'name': name,
-                                'price': round(price, 2),
-                                'change': round(change, 2),
-                                'change_percent': round(change_percent, 2)
-                            }
-                        else:
-                            # Fallback to placeholder if API limit reached
-                            latest_data[symbol] = {
-                                'name': name,
-                                'price': 'N/A',
-                                'change': 0,
-                                'change_percent': 0
-                            }
-                    else:
-                        latest_data[symbol] = {
-                            'name': name,
-                            'price': 'Error',
-                            'change': 0,
-                            'change_percent': 0
-                        }
-                except Exception as e:
-                    # Add placeholder for failed API call
-                    latest_data[symbol] = {
-                        'name': name,
-                        'price': 'N/A',
-                        'change': 0,
-                        'change_percent': 0
-                    }
-        
-        # Get US indices using yfinance
-        us_tickers = ['^GSPC', '^IXIC', '^TNX', '^DJI', 'CL=F']
-        data = yf.download(us_tickers, period='2d', interval='1d')
+        # Get all indices using yfinance (supports European markets)
+        all_tickers = [symbol for name, symbol in ordered_indices]
+        data = yf.download(all_tickers, period='2d', interval='1d')
         
         ticker_names = {
             '^DJI': 'Dow Jones',
             '^GSPC': 'S&P 500', 
             '^IXIC': 'NASDAQ',
             'CL=F': 'Crude Oil',
-            '^TNX': '10Y Treasury'
+            '^TNX': '10Y Treasury',
+            '^FCHI': 'CAC 40',
+            '^FTSE': 'FTSE 100',
+            '^GDAXI': 'DAX'
         }
         
-        for ticker in us_tickers:
+        latest_data = {}
+        
+        for name, symbol in ordered_indices:
             try:
-                if ticker in data['Close'].columns:
-                    close_prices = data['Close'][ticker].dropna()
+                if symbol in data['Close'].columns:
+                    close_prices = data['Close'][symbol].dropna()
                     if len(close_prices) == 0:
                         continue
                         
@@ -121,8 +77,8 @@ def get_market_data():
                         previous_price = close_prices.iloc[-2]
                     else:
                         # If no previous data, use open price
-                        if ticker in data['Open'].columns:
-                            open_prices = data['Open'][ticker].dropna()
+                        if symbol in data['Open'].columns:
+                            open_prices = data['Open'][symbol].dropna()
                             if len(open_prices) > 0:
                                 previous_price = open_prices.iloc[-1]
                             else:
@@ -140,24 +96,24 @@ def get_market_data():
                         change = latest_price - previous_price
                         change_percent = (change / previous_price * 100)
                     
-                    latest_data[ticker] = {
-                        'name': ticker_names.get(ticker, ticker),
+                    latest_data[symbol] = {
+                        'name': name,
                         'price': round(float(latest_price), 2) if latest_price != 0 else 'N/A',
                         'change': round(float(change), 2),
                         'change_percent': round(float(change_percent), 2)
                     }
                 else:
                     # If ticker not found, add placeholder
-                    latest_data[ticker] = {
-                        'name': ticker_names.get(ticker, ticker),
+                    latest_data[symbol] = {
+                        'name': name,
                         'price': 'N/A',
                         'change': 0,
                         'change_percent': 0
                     }
             except Exception as ticker_error:
                 # Add placeholder for failed ticker
-                latest_data[ticker] = {
-                    'name': ticker_names.get(ticker, ticker),
+                latest_data[symbol] = {
+                    'name': name,
                     'price': 'Error',
                     'change': 0,
                     'change_percent': 0
