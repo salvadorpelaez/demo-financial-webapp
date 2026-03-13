@@ -133,6 +133,10 @@ def get_market_data():
 def technical_indicators():
     return render_template('technical_indicators.html')
 
+@app.route('/feature2')
+def feature2():
+    return render_template('feature2.html')
+
 @app.route('/api/companies')
 def get_companies():
     conn = get_db_connection()
