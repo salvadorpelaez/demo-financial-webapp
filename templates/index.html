@@ -285,6 +285,8 @@
             margin-top: 20px;
             float: right;
             clear: both;
+            text-decoration: none;
+            display: inline-block;
         }
 
         .technical-indicators-btn:hover {
@@ -294,6 +296,34 @@
         }
 
         .technical-indicators-btn:active {
+            transform: translateY(0);
+        }
+
+        .feature2-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s ease;
+            margin-top: 10px;
+            float: right;
+            clear: both;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .feature2-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+
+        .feature2-btn:active {
             transform: translateY(0);
         }
     </style>
@@ -328,6 +358,9 @@
             </div>
             <a href="/technical_indicators" class="technical-indicators-btn">
                 Technical Indicators
+            </a>
+            <a href="/feature2" class="feature2-btn">
+                Feature 2
             </a>
         </main>
     </div>
