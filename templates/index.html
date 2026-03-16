@@ -326,6 +326,34 @@
         .feature2-btn:active {
             transform: translateY(0);
         }
+
+        .feature3-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s ease;
+            margin-top: 10px;
+            float: right;
+            clear: both;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .feature3-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+
+        .feature3-btn:active {
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body>
@@ -362,6 +390,9 @@
             <a href="/feature2" class="feature2-btn">
                 Feature 2
             </a>
+            <a href="/feature3" class="feature3-btn">
+                Feature 3
+            </a>
         </main>
     </div>
 
@@ -370,73 +401,39 @@
         async function loadMarketData() {
             try {
                 const response = await fetch('/api/market-data');
-                const data = await response.json();
+                const responseData = await response.json();
                 
-                if (data.error) {
-                    throw new Error(data.error);
+                if (responseData.error) {
+                    throw new Error(responseData.error);
                 }
                 
                 const container = document.getElementById('marketDataContainer');
                 container.className = 'market-data';
                 
-                // Convert data to array and split into two rows with explicit order
-                const dataArray = Object.entries(data.data);
-                console.log('All indices with exact names:');
-                dataArray.forEach(([ticker, info]) => {
-                    console.log(`Ticker: ${ticker}, Name: "${info.name}"`);
-                });
+                // Create two rows - first 5 indices in top row, last 6 in bottom row
+                const topRowIndices = ['S&P 500', 'NASDAQ', 'Dow Jones', '10Y Treasury', 'Crude Oil'];
+                const bottomRowIndices = ['Nikkei 225', 'Hang Seng', 'ASX 200', 'CAC 40', 'FTSE 100', 'DAX'];
                 
-                // Define explicit order for top row (4 indices) - moved 10Y Treasury to bottom
-                const topRowOrder = ['S&P 500', 'NASDAQ', 'Dow Jones', 'Crude Oil'];
-                // Define explicit order for bottom row (4 indices) - 10Y Treasury first, then European
-                const bottomRowOrder = ['10Y Treasury', 'CAC 40', 'CAC40', 'FTSE 100', 'FTSE100', 'DAX'];
+                let html = '<div class="market-row top-row">';
                 
-                // Create ordered arrays for each row
-                const topRow = [];
-                const bottomRow = [];
-                
-                // Find each index by name and add to appropriate row
-                dataArray.forEach(([ticker, info]) => {
-                    const indexName = info.name.trim(); // Trim whitespace
-                    console.log(`Processing: "${indexName}"`);
-                    
-                    const topRowIndex = topRowOrder.indexOf(indexName);
-                    const bottomRowIndex = bottomRowOrder.indexOf(indexName);
-                    
-                    console.log(`Top row index: ${topRowIndex}, Bottom row index: ${bottomRowIndex}`);
-                    
-                    if (topRowIndex !== -1) {
-                        console.log(`Adding ${indexName} to top row at position ${topRowIndex}`);
-                        topRow[topRowIndex] = [ticker, info];
-                    } else if (bottomRowIndex !== -1) {
-                        console.log(`Adding ${indexName} to bottom row at position ${bottomRowIndex}`);
-                        bottomRow[bottomRowIndex] = [ticker, info];
-                    } else {
-                        console.log(`${indexName} not found in either row order`);
+                // Top row (5 items)
+                topRowIndices.forEach(name => {
+                    const data = Object.entries(responseData.data).find(([key, value]) => value.name === name);
+                    if (data) {
+                        html += createMarketCard(data[1]);
                     }
                 });
                 
-                // Filter out any undefined entries
-                const filteredTopRow = topRow.filter(item => item !== undefined);
-                const filteredBottomRow = bottomRow.filter(item => item !== undefined);
+                html += '</div><div class="market-row bottom-row">';
                 
-                console.log('Final top row:', filteredTopRow.map(([ticker, info]) => info.name));
-                console.log('Final bottom row:', filteredBottomRow.map(([ticker, info]) => info.name));
+                // Bottom row (6 items)
+                bottomRowIndices.forEach(name => {
+                    const data = Object.entries(responseData.data).find(([key, value]) => value.name === name);
+                    if (data) {
+                        html += createMarketCard(data[1]);
+                    }
+                });
                 
-                let html = '';
-                
-                // Create top row with explicit order
-                html += '<div class="market-row top-row">';
-                for (const [ticker, info] of filteredTopRow) {
-                    html += createMarketCard(info);
-                }
-                html += '</div>';
-                
-                // Create bottom row with explicit order
-                html += '<div class="market-row bottom-row">';
-                for (const [ticker, info] of filteredBottomRow) {
-                    html += createMarketCard(info);
-                }
                 html += '</div>';
                 
                 container.innerHTML = html;

@@ -40,14 +40,17 @@ def get_market_data():
     try:
         # Define order: US first, then European at bottom
         ordered_indices = [
-            ('S&P 500', '^GSPC'),
-            ('NASDAQ', '^IXIC'),
-            ('Dow Jones', '^DJI'),
-            ('Crude Oil', 'CL=F'),
-            ('10Y Treasury', '^TNX'),
-            ('CAC 40', '^FCHI'),
-            ('FTSE 100', '^FTSE'), 
-            ('DAX', '^GDAXI')
+            ("S&P 500", "^GSPC"),
+            ("NASDAQ", "^IXIC"),
+            ("Dow Jones", "^DJI"),
+            ("10Y Treasury", "^TNX"),
+            ("Crude Oil", "CL=F"),
+            ("Nikkei 225", "^N225"),
+            ("Hang Seng", "^HSI"),
+            ("ASX 200", "^AXJO"),
+            ("CAC 40", "^FCHI"),
+            ("FTSE 100", "^FTSE"), 
+            ("DAX", "^GDAXI")
         ]
         
         # Get all indices using yfinance (supports European markets)
@@ -58,8 +61,11 @@ def get_market_data():
             '^DJI': 'Dow Jones',
             '^GSPC': 'S&P 500', 
             '^IXIC': 'NASDAQ',
-            'CL=F': 'Crude Oil',
             '^TNX': '10Y Treasury',
+            'CL=F': 'Crude Oil',
+            '^N225': 'Nikkei 225',
+            '^HSI': 'Hang Seng',
+            '^AXJO': 'ASX 200',
             '^FCHI': 'CAC 40',
             '^FTSE': 'FTSE 100',
             '^GDAXI': 'DAX'
@@ -140,6 +146,10 @@ def technical_indicators():
 @app.route('/feature2')
 def feature2():
     return render_template('feature2.html')
+
+@app.route('/feature3')
+def feature3():
+    return render_template('feature3.html')
 
 @app.route('/api/companies')
 def get_companies():
