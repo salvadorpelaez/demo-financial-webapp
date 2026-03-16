@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Companies Database</title>
+    <title>Valerius - Main Dashboard</title>
     <style>
         * {
             margin: 0;
@@ -78,79 +78,53 @@
             object-fit: cover;
         }
 
-        .login-input {
-            padding: 8px 12px;
-            border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 6px;
-            background: rgba(255,255,255,0.1);
+        .back-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
-            font-size: 14px;
-            backdrop-filter: blur(10px);
-        }
-
-        .login-input::placeholder {
-            color: rgba(255,255,255,0.7);
-        }
-
-        .login-input:focus {
-            outline: none;
-            border-color: rgba(255,255,255,0.6);
-            background: rgba(255,255,255,0.2);
-        }
-
-        .login-btn {
-            padding: 8px 16px;
-            background: rgba(255,255,255,0.2);
-            border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 6px;
-            color: white;
-            cursor: pointer;
-            font-size: 14px;
-            transition: all 0.3s;
-            backdrop-filter: blur(10px);
-        }
-
-        .login-btn:hover {
-            background: rgba(255,255,255,0.3);
-            border-color: rgba(255,255,255,0.5);
-        }
-
-        h1 {
-            font-size: 2.5em;
-            margin-bottom: 10px;
-            margin-top: 60px;
-        }
-
-        .subtitle {
-            opacity: 0.9;
-            font-size: 1.1em;
-            margin-top: 10px;
-        }
-
-        .content {
-            padding: 20px 100px 100px 100px;
-            min-height: 800px;
-        }
-
-        .error {
-            background: #f8d7da;
-            color: #721c24;
-            padding: 15px;
+            border: none;
             border-radius: 8px;
-            margin: 20px 0;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+            position: absolute;
+            top: 20px;
+            right: 30px;
         }
 
-        .no-results {
-            text-align: center;
+        .back-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .main-content {
             padding: 40px;
+            background: white;
+        }
+
+        .page-title {
+            font-size: 32px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+
+        .page-subtitle {
+            font-size: 18px;
             color: #6c757d;
+            margin-bottom: 40px;
+            text-align: center;
         }
 
         .market-data {
             display: flex;
             flex-direction: column;
-            gap: 40px;
-            margin-top: 0px;
+            gap: 20px;
+            margin-top: 20px;
         }
         
         .market-row {
@@ -180,19 +154,16 @@
             max-width: 95px;
         }
         
-        /* Ensure 4 cards in top row are evenly spaced */
         .top-row .market-card {
             flex: 1;
             max-width: none;
         }
         
-        /* Ensure 4 cards in bottom row are evenly spaced */
         .bottom-row .market-card {
             flex: 1;
             max-width: none;
         }
         
-        /* Responsive adjustments */
         @media (max-width: 1200px) {
             .market-row {
                 flex-wrap: wrap;
@@ -264,7 +235,7 @@
         .footer-text {
             position: relative;
             float: right;
-            margin-top: 10px;
+            margin-top: 20px;
             font-size: 16px;
             color: #6c757d;
             font-style: italic;
@@ -354,35 +325,6 @@
         .feature3-btn:active {
             transform: translateY(0);
         }
-
-        .splash-image-container {
-            text-align: left;
-            margin-top: 50px;
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            gap: 30px;
-        }
-
-        .splash-image {
-            max-width: 60%;
-            height: auto;
-            border-radius: 12px;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
-            transition: transform 0.3s ease;
-        }
-
-        .splash-image:hover {
-            transform: scale(1.02);
-        }
-
-        .splash-text {
-            font-size: 24px;
-            font-weight: 600;
-            color: #2c3e50;
-            flex: 1;
-            line-height: 1.4;
-        }
     </style>
 </head>
 <body>
@@ -394,31 +336,28 @@
                 </div>
                 <span class="logo-text">Valerius - Value Analytics Made Simple</span>
             </div>
-            <div class="login-container">
-                <input type="text" id="username" class="login-input" placeholder="Username">
-                <input type="password" id="password" class="login-input" placeholder="Password">
-                <button onclick="handleLogin()" class="login-btn">Login</button>
-            </div>
-            </header>
+            <a href="/" class="back-btn">← Back to Splash</a>
+        </header>
 
-        <main class="content">
-            <div id="error" class="error" style="display: none;"></div>
-            <div id="noResults" class="no-results" style="display: none;">
-                <h3>No companies found</h3>
-                <p>Try adjusting your search criteria</p>
-            </div>
+        <main class="main-content">
+            <h1 class="page-title">Main Dashboard</h1>
+            <p class="page-subtitle">Complete analytics and trading platform</p>
+
             <div id="marketDataContainer" class="market-loading">
                 <p>Loading market data...</p>
             </div>
             <div class="footer-text">
                 Hello world! 🐍☕
             </div>
-            <div class="splash-image-container">
-                <img src="/static/my%20dashboard%20sample%20for%20splashpage.png" alt="Splash Dashboard" class="splash-image">
-                <div class="splash-text">
-                    Create and analyze your own portfolio!
-                </div>
-            </div>
+            <a href="/technical_indicators" class="technical-indicators-btn">
+                Technical Indicators
+            </a>
+            <a href="/feature2" class="feature2-btn">
+                Feature 2
+            </a>
+            <a href="/feature3" class="feature3-btn">
+                Feature 3
+            </a>
         </main>
     </div>
 
@@ -501,39 +440,6 @@
                 </div>
             `;
         }
-
-        // Login functionality
-        function handleLogin() {
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            
-            if (!username || !password) {
-                alert('Please enter both username and password');
-                return;
-            }
-            
-            // Navigate to main page with full features
-            window.location.href = '/main';
-        }
-        
-        // Technical Indicators functionality
-        function handleTechnicalIndicators() {
-            console.log('Technical Indicators button clicked');
-            alert('Technical Indicators functionality coming soon!');
-        }
-
-        // Handle Enter key in login inputs
-        document.getElementById('username').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                document.getElementById('password').focus();
-            }
-        });
-
-        document.getElementById('password').addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                handleLogin();
-            }
-        });
 
         // Load market data when page loads
         window.addEventListener('load', loadMarketData);

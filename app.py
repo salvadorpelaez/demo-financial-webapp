@@ -139,6 +139,10 @@ def get_market_data():
     except Exception as e:
         return jsonify({'error': str(e)})
 
+@app.route('/main')
+def main_page():
+    return render_template('main.html')
+
 @app.route('/technical_indicators')
 def technical_indicators():
     return render_template('technical_indicators.html')
