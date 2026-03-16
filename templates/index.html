@@ -354,6 +354,35 @@
         .feature3-btn:active {
             transform: translateY(0);
         }
+
+        .splash-image-container {
+            text-align: left;
+            margin-top: 50px;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 30px;
+        }
+
+        .splash-image {
+            max-width: 60%;
+            height: auto;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .splash-image:hover {
+            transform: scale(1.02);
+        }
+
+        .splash-text {
+            font-size: 24px;
+            font-weight: 600;
+            color: #2c3e50;
+            flex: 1;
+            line-height: 1.4;
+        }
     </style>
 </head>
 <body>
@@ -383,6 +412,12 @@
             </div>
             <div class="footer-text">
                 Hello world! 🐍☕
+            </div>
+            <div class="splash-image-container">
+                <img src="/static/my%20dashboard%20sample%20for%20splashpage.png" alt="Splash Dashboard" class="splash-image">
+                <div class="splash-text">
+                    Create and analyze your own portfolio!
+                </div>
             </div>
         </main>
     </div>
