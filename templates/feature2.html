@@ -170,21 +170,74 @@
             font-size: 16px;
         }
 
-        .stock-dropdown {
+        .stock-input {
             width: 100%;
             padding: 12px;
             border: 2px solid #dee2e6;
             border-radius: 6px;
             font-size: 14px;
             background: white;
-            margin-bottom: 15px;
+            margin-bottom: 5px;
             transition: border-color 0.3s ease;
         }
 
-        .stock-dropdown:focus {
+        .stock-input:focus {
             outline: none;
             border-color: #667eea;
             box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+
+        .stock-suggestions {
+            position: relative;
+            width: 100%;
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            background: white;
+            margin-bottom: 15px;
+            display: none;
+            z-index: 1000;
+        }
+
+        .stock-suggestion {
+            padding: 10px 12px;
+            cursor: pointer;
+            border-bottom: 1px solid #f8f9fa;
+            transition: background-color 0.2s ease;
+        }
+
+        .stock-suggestion:hover {
+            background-color: #f8f9fa;
+        }
+
+        .stock-suggestion:last-child {
+            border-bottom: none;
+        }
+
+        .stock-suggestion.selected {
+            background-color: #667eea;
+            color: white;
+        }
+
+        .suggestion-ticker {
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .suggestion-name {
+            font-size: 12px;
+            color: #6c757d;
+            margin-left: 8px;
+        }
+
+        .suggestion-exchange {
+            font-size: 11px;
+            color: #28a745;
+            margin-left: 8px;
+            padding: 2px 6px;
+            background: #f8f9fa;
+            border-radius: 3px;
         }
 
         .add-stock-btn {
@@ -240,10 +293,9 @@
             <p class="page-subtitle">Advanced analytics and tools for enhanced market insights</p>
 
             <div class="stock-selection">
-                <label for="stockDropdown" class="stock-label">Select stock name/stock ticker:</label>
-                <select id="stockDropdown" class="stock-dropdown">
-                    <option value="">Loading stocks...</option>
-                </select>
+                <label for="stockInput" class="stock-label">Select stock name/stock ticker:</label>
+                <input type="text" id="stockInput" class="stock-input" placeholder="Type stock name or ticker...">
+                <div id="stockSuggestions" class="stock-suggestions"></div>
                 <button id="addStockBtn" class="add-stock-btn">Add to Portfolio</button>
             </div>
 
@@ -254,8 +306,9 @@
     </div>
 
     <script>
-        // Stock selection functionality
+        // Stock autocomplete functionality
         let allStocks = [];
+        let selectedStock = null;
 
         // Load all stocks when page loads
         window.addEventListener('load', loadStocks);
@@ -264,80 +317,148 @@
             try {
                 const response = await fetch('/api/all-stocks');
                 allStocks = await response.json();
-                populateStockDropdown();
+                console.log('Loaded', allStocks.length, 'stocks');
             } catch (error) {
                 console.error('Error loading stocks:', error);
-                document.getElementById('stockDropdown').innerHTML = '<option value="">Error loading stocks</option>';
             }
         }
 
-        function populateStockDropdown() {
-            const dropdown = document.getElementById('stockDropdown');
+        // Handle input in textbox
+        document.getElementById('stockInput').addEventListener('input', function() {
+            const searchTerm = this.value.toLowerCase().trim();
+            const suggestionsDiv = document.getElementById('stockSuggestions');
             
-            // Clear existing options
-            dropdown.innerHTML = '<option value="">Select a stock...</option>';
-            
-            // Add stocks grouped by exchange
-            const groupedStocks = groupStocksByExchange(allStocks);
-            
-            Object.keys(groupedStocks).sort().forEach(exchange => {
-                // Add exchange as optgroup
-                const optgroup = document.createElement('optgroup');
-                optgroup.label = exchange;
-                
-                // Add stocks for this exchange
-                groupedStocks[exchange].forEach(stock => {
-                    const option = document.createElement('option');
-                    option.value = stock.ticker;
-                    option.textContent = `${stock.ticker} - ${stock.name}`;
-                    optgroup.appendChild(option);
-                });
-                
-                dropdown.appendChild(optgroup);
-            });
-        }
-
-        function groupStocksByExchange(stocks) {
-            const grouped = {};
-            stocks.forEach(stock => {
-                if (!grouped[stock.exchange]) {
-                    grouped[stock.exchange] = [];
-                }
-                grouped[stock.exchange].push(stock);
-            });
-            return grouped;
-        }
-
-        // Handle stock selection
-        document.getElementById('addStockBtn').addEventListener('click', function() {
-            const selectedStock = document.getElementById('stockDropdown').value;
-            
-            if (!selectedStock) {
-                alert('Please select a stock first');
+            if (searchTerm.length < 2) {
+                suggestionsDiv.style.display = 'none';
+                selectedStock = null;
                 return;
             }
             
-            // Find stock details
-            const stock = allStocks.find(s => s.ticker === selectedStock);
+            // Filter stocks based on search term
+            const filteredStocks = allStocks.filter(stock => 
+                stock.ticker.toLowerCase().includes(searchTerm) ||
+                stock.name.toLowerCase().includes(searchTerm)
+            );
             
-            if (stock) {
-                alert(`Added to portfolio:\nTicker: ${stock.ticker}\nName: ${stock.name}\nExchange: ${stock.exchange}\nSector: ${stock.sector || 'N/A'}`);
-                // Here you would typically add the stock to a portfolio
-                console.log('Stock added to portfolio:', stock);
+            // Limit to top 10 results
+            const limitedStocks = filteredStocks.slice(0, 10);
+            
+            if (limitedStocks.length > 0) {
+                displaySuggestions(limitedStocks);
+            } else {
+                suggestionsDiv.style.display = 'none';
+                selectedStock = null;
             }
         });
 
-        // Add search functionality to dropdown
-        document.getElementById('stockDropdown').addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            const options = this.querySelectorAll('option');
+        function displaySuggestions(stocks) {
+            const suggestionsDiv = document.getElementById('stockSuggestions');
+            suggestionsDiv.innerHTML = '';
             
-            options.forEach(option => {
-                if (option.value === '') return; // Skip placeholder
+            stocks.forEach(stock => {
+                const suggestionDiv = document.createElement('div');
+                suggestionDiv.className = 'stock-suggestion';
+                suggestionDiv.innerHTML = `
+                    <span class="suggestion-ticker">${stock.ticker}</span>
+                    <span class="suggestion-name">${stock.name}</span>
+                    <span class="suggestion-exchange">${stock.exchange}</span>
+                `;
                 
-                const text = option.textContent.toLowerCase();
-                option.style.display = text.includes(searchTerm) ? '' : 'none';
+                suggestionDiv.addEventListener('click', function() {
+                    selectStock(stock);
+                });
+                
+                suggestionsDiv.appendChild(suggestionDiv);
             });
+            
+            suggestionsDiv.style.display = 'block';
+        }
+
+        function selectStock(stock) {
+            selectedStock = stock;
+            document.getElementById('stockInput').value = `${stock.ticker} - ${stock.name}`;
+            document.getElementById('stockSuggestions').style.display = 'none';
+        }
+
+        // Handle keyboard navigation
+        document.getElementById('stockInput').addEventListener('keydown', function(e) {
+            const suggestionsDiv = document.getElementById('stockSuggestions');
+            const suggestions = suggestionsDiv.querySelectorAll('.stock-suggestion');
+            
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                const selected = suggestionsDiv.querySelector('.selected');
+                if (selected) {
+                    selected.classList.remove('selected');
+                    const next = selected.nextElementSibling;
+                    if (next) {
+                        next.classList.add('selected');
+                        next.scrollIntoView({ block: 'nearest' });
+                    }
+                } else if (suggestions.length > 0) {
+                    suggestions[0].classList.add('selected');
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                const selected = suggestionsDiv.querySelector('.selected');
+                if (selected) {
+                    selected.classList.remove('selected');
+                    const prev = selected.previousElementSibling;
+                    if (prev) {
+                        prev.classList.add('selected');
+                        prev.scrollIntoView({ block: 'nearest' });
+                    }
+                }
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const selected = suggestionsDiv.querySelector('.selected');
+                if (selected) {
+                    selected.click();
+                } else if (selectedStock) {
+                    // If Enter pressed with selected stock, add to portfolio
+                    addStockToPortfolio();
+                }
+            } else if (e.key === 'Escape') {
+                suggestionsDiv.style.display = 'none';
+                selectedStock = null;
+            }
+        });
+
+        // Handle stock selection
+        document.getElementById('addStockBtn').addEventListener('click', addStockToPortfolio);
+
+        function addStockToPortfolio() {
+            if (!selectedStock) {
+                // Try to find exact match from input
+                const inputText = document.getElementById('stockInput').value.trim();
+                if (inputText) {
+                    // Extract ticker from input (first part before ' - ')
+                    const ticker = inputText.split(' - ')[0].toUpperCase();
+                    selectedStock = allStocks.find(s => s.ticker === ticker);
+                }
+            }
+            
+            if (!selectedStock) {
+                alert('Please select a valid stock from the suggestions');
+                return;
+            }
+            
+            // Show stock details
+            alert(`Added to portfolio:\nTicker: ${selectedStock.ticker}\nName: ${selectedStock.name}\nExchange: ${selectedStock.exchange}\nSector: ${selectedStock.sector || 'N/A'}`);
+            
+            // Here you would typically add the stock to a portfolio
+            console.log('Stock added to portfolio:', selectedStock);
+            
+            // Clear selection
+            document.getElementById('stockInput').value = '';
+            selectedStock = null;
+        }
+
+        // Hide suggestions when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.stock-selection')) {
+                document.getElementById('stockSuggestions').style.display = 'none';
+            }
         });
     </script>
 </body>
