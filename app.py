@@ -31,6 +31,11 @@ def sp500_page():
     # For now, we'll create a template for the S&P 500 page
     return render_template('sp500.html')
 
+@app.route('/index-selector')
+def index_selector_page():
+    # This will serve the valmainpage_v1.0.11 index page as index selector
+    return render_template('index_selector.html')
+
 @app.route('/test')
 def test_page():
     return render_template('test_classification.html')

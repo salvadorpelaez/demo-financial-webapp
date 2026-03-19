@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Companies Database</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+
+        header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+            position: relative;
+        }
+
+        .login-container {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .logo-container {
+            position: absolute;
+            top: 10px;
+            left: 30px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .logo-text {
+            color: white;
+            font-size: 18px;
+            font-weight: 600;
+            opacity: 0.9;
+        }
+
+        .dropdown-container {
+            position: absolute;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 10;
+        }
+
+        .dropdown-select {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.15);
+            border: 2px solid black;
+            border-radius: 6px;
+            color: black;
+            font-size: 14px;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            min-width: 300px;
+        }
+
+        .dropdown-select option {
+            background: #2c3e50;
+            color: white;
+        }
+
+        .logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.3);
+            overflow: hidden;
+        }
+
+        .logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .login-input {
+            padding: 8px 12px;
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 6px;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            font-size: 14px;
+            backdrop-filter: blur(10px);
+        }
+
+        .login-input::placeholder {
+            color: rgba(255,255,255,0.7);
+        }
+
+        .login-input:focus {
+            outline: none;
+            border-color: rgba(255,255,255,0.6);
+            background: rgba(255,255,255,0.2);
+        }
+
+        .login-btn {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+        }
+
+        .login-btn:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+        }
+
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            margin-top: 60px;
+        }
+
+        .subtitle {
+            opacity: 0.9;
+            font-size: 1.1em;
+            margin-top: 10px;
+        }
+
+        .content {
+            padding: 150px;
+            min-height: 600px;
+        }
+
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .market-data {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .market-card {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.2s;
+        }
+
+        .market-card:hover {
+            transform: translateY(-2px);
+        }
+
+        .market-name {
+            font-size: 14px;
+            color: #6c757d;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+
+        .market-price {
+            font-size: 24px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .market-change {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .market-change.positive {
+            color: #28a745;
+        }
+
+        .market-change.negative {
+            color: #dc3545;
+        }
+
+        .market-loading {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+
+        .footer-text {
+            position: relative;
+            float: right;
+            margin-top: 20px;
+            font-size: 16px;
+            color: #6c757d;
+            font-style: italic;
+            clear: both;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="logo-container">
+                <div class="logo">
+                    <img src="/static/logo.png" alt="Company Logo">
+                </div>
+                <span class="logo-text">Valerius - Value Analytics Made Simple</span>
+            </div>
+            <div class="dropdown-container">
+                <select id="benchmarkSelect" class="dropdown-select" onchange="handleBenchmarkChange()">
+                    <option value="">Select Benchmark</option>
+                    <option value="sp500">S&P 500: Large-Cap Core & Dividend Benchmarks</option>
+                    <option value="nasdaq100">Nasdaq-100: AI-Driven Hypergrowth & Tech Innovation</option>
+                    <option value="dowjones">Dow Jones: Ultra-Mature Blue Chips & Dividend Streaks</option>
+                    <option value="russell2000">Russell 2000: Scrappy Small-Cap Value & Hidden Gems</option>
+                </select>
+            </div>
+            <div class="login-container">
+                <input type="text" id="username" class="login-input" placeholder="Username">
+                <input type="password" id="password" class="login-input" placeholder="Password">
+                <button onclick="handleLogin()" class="login-btn">Login</button>
+            </div>
+            </header>
+
+        <main class="content">
+            <div id="error" class="error" style="display: none;"></div>
+            <div id="noResults" class="no-results" style="display: none;">
+                <h3>No companies found</h3>
+                <p>Try adjusting your search criteria</p>
+            </div>
+            <div id="marketDataContainer" class="market-loading">
+                <p>Loading market data...</p>
+            </div>
+            <div class="footer-text">
+                Hello world! 🐍☕
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // Market data functionality
+        async function loadMarketData() {
+            try {
+                const response = await fetch('/api/market-data');
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                const container = document.getElementById('marketDataContainer');
+                container.className = 'market-data';
+                
+                let html = '';
+                for (const [ticker, info] of Object.entries(data.data)) {
+                    const changeClass = info.change >= 0 ? 'positive' : 'negative';
+                    const changeSymbol = info.change >= 0 ? '+' : '';
+                    
+                    let priceDisplay = info.price;
+                    if (info.price === 'N/A') {
+                        priceDisplay = 'N/A';
+                    } else if (info.price === 'Error') {
+                        priceDisplay = 'Error';
+                    } else {
+                        priceDisplay = `$${parseFloat(info.price).toLocaleString()}`;
+                    }
+                    
+                    let changeDisplay = '';
+                    if (info.price === 'N/A' || info.price === 'Error') {
+                        changeDisplay = 'No data';
+                    } else {
+                        changeDisplay = `${changeSymbol}${info.change.toFixed(2)} (${changeSymbol}${info.change_percent.toFixed(2)}%)`;
+                    }
+                    
+                    html += `
+                        <div class="market-card">
+                            <div class="market-name">${info.name}</div>
+                            <div class="market-price">${priceDisplay}</div>
+                            <div class="market-change ${info.price === 'N/A' || info.price === 'Error' ? '' : changeClass}">
+                                ${changeDisplay}
+                            </div>
+                        </div>
+                    `;
+                }
+                
+                container.innerHTML = html;
+                
+            } catch (error) {
+                const container = document.getElementById('marketDataContainer');
+                container.innerHTML = `<p>Error loading market data: ${error.message}</p>`;
+            }
+        }
+
+        // Benchmark dropdown functionality
+        function handleBenchmarkChange() {
+            const selectedValue = document.getElementById('benchmarkSelect').value;
+            if (selectedValue) {
+                if (selectedValue === 'sp500') {
+                    // Navigate to S&P 500 page (valsp500mainpage_v1.0.11)
+                    window.location.href = '/sp500';
+                } else {
+                    alert(`Selected benchmark: ${selectedValue}`);
+                    // TODO: Implement other benchmark pages
+                }
+            }
+        }
+
+        // Login functionality
+        function handleLogin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            if (!username || !password) {
+                alert('Please enter both username and password');
+                return;
+            }
+            
+            // For now, just show a login message
+            // TODO: Implement actual authentication
+            alert(`Login attempt for user: ${username}`);
+        }
+
+        // Handle Enter key in login inputs
+        document.getElementById('username').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('password').focus();
+            }
+        });
+
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleLogin();
+            }
+        });
+
+        // Load market data when page loads
+        window.addEventListener('load', loadMarketData);
+        
+        // Refresh market data every 60 seconds
+        setInterval(loadMarketData, 60000);
+    </script>
+</body>
+</html>
