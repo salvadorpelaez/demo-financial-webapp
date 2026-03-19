@@ -354,6 +354,34 @@
         .index-analysis-btn:active {
             transform: translateY(0);
         }
+
+        .index-selector-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 12px 20px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            transition: all 0.3s ease;
+            margin-top: 10px;
+            float: right;
+            clear: both;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .index-selector-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+            background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+        }
+
+        .index-selector-btn:active {
+            transform: translateY(0);
+        }
     </style>
 </head>
 <body>
@@ -389,6 +417,9 @@
             </a>
             <a href="/sp500" class="index-analysis-btn">
                 Index Analysis
+            </a>
+            <a href="/index-selector" class="index-selector-btn">
+                Index Selector
             </a>
         </main>
     </div>

@@ -140,6 +140,35 @@
             border-color: rgba(255,255,255,0.5);
         }
 
+        .dashboard-btn-container {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .dashboard-btn {
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 6px;
+            color: white;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+            backdrop-filter: blur(10px);
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .dashboard-btn:hover {
+            background: rgba(255,255,255,0.3);
+            border-color: rgba(255,255,255,0.5);
+            transform: translateY(-1px);
+        }
+
         h1 {
             font-size: 2.5em;
             margin-bottom: 10px;
@@ -253,10 +282,8 @@
                     <option value="russell2000">Russell 2000: Scrappy Small-Cap Value & Hidden Gems</option>
                 </select>
             </div>
-            <div class="login-container">
-                <input type="text" id="username" class="login-input" placeholder="Username">
-                <input type="password" id="password" class="login-input" placeholder="Password">
-                <button onclick="handleLogin()" class="login-btn">Login</button>
+            <div class="dashboard-btn-container">
+                <a href="/main" class="dashboard-btn">← Back to My Dashboard</a>
             </div>
             </header>
 
