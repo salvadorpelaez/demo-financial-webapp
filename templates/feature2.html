@@ -261,6 +261,127 @@
             transform: translateY(0);
         }
 
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .search-stock-btn {
+            background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .search-stock-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+        }
+
+        .search-stock-btn:active {
+            transform: translateY(0);
+        }
+
+        .search-results {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 1px solid #dee2e6;
+        }
+
+        .search-results h3 {
+            margin-bottom: 20px;
+            color: #2c3e50;
+            font-size: 20px;
+        }
+
+        .search-results-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .stock-tile {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 1px solid #dee2e6;
+            transition: all 0.3s ease;
+        }
+
+        .stock-tile:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+
+        .stock-tile-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .stock-ticker {
+            font-size: 18px;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .stock-exchange {
+            font-size: 12px;
+            color: #6c757d;
+            background: #f8f9fa;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .stock-name {
+            font-size: 14px;
+            color: #495057;
+            margin-bottom: 10px;
+            line-height: 1.4;
+        }
+
+        .stock-price {
+            font-size: 24px;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 5px;
+        }
+
+        .stock-change {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .stock-change.positive {
+            color: #28a745;
+        }
+
+        .stock-change.negative {
+            color: #dc3545;
+        }
+
+        .loading-tile {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+        }
+
+        .error-tile {
+            background: #f8d7da;
+            color: #721c24;
+            border-color: #f5c6cb;
+        }
+
         .coming-soon {
             text-align: center;
             padding: 60px 20px;
@@ -296,7 +417,15 @@
                 <label for="stockInput" class="stock-label">Select stock name/stock ticker:</label>
                 <input type="text" id="stockInput" class="stock-input" placeholder="Type stock name or ticker...">
                 <div id="stockSuggestions" class="stock-suggestions"></div>
-                <button id="addStockBtn" class="add-stock-btn">Add to Portfolio</button>
+                <div class="button-group">
+                    <button id="searchStockBtn" class="search-stock-btn">Search Stock</button>
+                    <button id="addStockBtn" class="add-stock-btn">Add to Portfolio</button>
+                </div>
+            </div>
+
+            <div id="searchResults" class="search-results" style="display: none;">
+                <h3>Search Results</h3>
+                <div id="searchResultsContainer" class="search-results-container"></div>
             </div>
 
             <div class="footer-text">
@@ -426,6 +555,89 @@
 
         // Handle stock selection
         document.getElementById('addStockBtn').addEventListener('click', addStockToPortfolio);
+        document.getElementById('searchStockBtn').addEventListener('click', searchStock);
+
+        async function searchStock() {
+            const searchTerm = document.getElementById('stockInput').value.trim();
+            
+            if (!searchTerm) {
+                alert('Please enter a stock ticker or company name to search');
+                return;
+            }
+            
+            const searchResultsDiv = document.getElementById('searchResults');
+            const searchResultsContainer = document.getElementById('searchResultsContainer');
+            
+            // Show search results section
+            searchResultsDiv.style.display = 'block';
+            
+            // Show loading state
+            searchResultsContainer.innerHTML = '<div class="loading-tile">Searching for stock...</div>';
+            
+            try {
+                const response = await fetch(`/api/search-stock?query=${encodeURIComponent(searchTerm)}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displaySearchResults(data);
+                } else {
+                    throw new Error(data.error || 'Search failed');
+                }
+            } catch (error) {
+                console.error('Search error:', error);
+                searchResultsContainer.innerHTML = `
+                    <div class="stock-tile error-tile">
+                        <div class="stock-ticker">Error</div>
+                        <div class="stock-name">${error.message}</div>
+                    </div>
+                `;
+            }
+        }
+
+        function displaySearchResults(results) {
+            const searchResultsContainer = document.getElementById('searchResultsContainer');
+            
+            if (results.length === 0) {
+                searchResultsContainer.innerHTML = '<div class="loading-tile">No results found</div>';
+                return;
+            }
+            
+            let html = '';
+            results.forEach(stock => {
+                const changeClass = stock.change >= 0 ? 'positive' : 'negative';
+                const changeSymbol = stock.change >= 0 ? '+' : '';
+                
+                let priceDisplay = stock.price;
+                if (stock.price === 'N/A' || stock.price === 'Error') {
+                    priceDisplay = stock.price;
+                } else {
+                    priceDisplay = `$${parseFloat(stock.price).toFixed(2)}`;
+                }
+                
+                let changeDisplay = '';
+                if (stock.price === 'N/A' || stock.price === 'Error') {
+                    changeDisplay = 'No data';
+                } else {
+                    changeDisplay = `${changeSymbol}${stock.change.toFixed(2)} (${changeSymbol}${stock.change_percent.toFixed(2)}%)`;
+                }
+                
+                html += `
+                    <div class="stock-tile">
+                        <div class="stock-tile-header">
+                            <div class="stock-ticker">${stock.ticker}</div>
+                            <div class="stock-exchange">${stock.exchange}</div>
+                        </div>
+                        <div class="stock-name">${stock.name}</div>
+                        <div class="stock-price">${priceDisplay}</div>
+                        <div class="stock-change ${stock.price === 'N/A' || stock.price === 'Error' ? '' : changeClass}">
+                            ${changeDisplay}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            searchResultsContainer.innerHTML = html;
+        }
 
         function addStockToPortfolio() {
             if (!selectedStock) {

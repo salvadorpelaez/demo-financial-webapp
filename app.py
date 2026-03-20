@@ -455,6 +455,103 @@ def get_all_stocks():
     finally:
         conn.close()
 
+@app.route('/api/search-stock')
+def search_stock():
+    """Search for stocks in NASDAQ and NYSE tables, then fetch current price from yfinance"""
+    query = request.args.get('query', '').strip()
+    
+    if not query:
+        return jsonify({'error': 'Query parameter is required'}), 400
+    
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        results = []
+        
+        # First search NASDAQ table
+        cursor.execute("""
+            SELECT Symbol as ticker, CompanyName as name, 'NASDAQ' as exchange
+            FROM NASDAQ 
+            WHERE UPPER(Symbol) LIKE UPPER(?) OR UPPER(CompanyName) LIKE UPPER(?)
+            LIMIT 5
+        """, (f'%{query}%', f'%{query}%'))
+        
+        nasdaq_results = cursor.fetchall()
+        for row in nasdaq_results:
+            results.append({
+                'ticker': row[0],
+                'name': row[1],
+                'exchange': row[2]
+            })
+        
+        # If no results in NASDAQ, search NYSE table
+        if len(results) == 0:
+            cursor.execute("""
+                SELECT Ticker as ticker, Company_Name as name, 'NYSE' as exchange
+                FROM NYSE 
+                WHERE UPPER(Ticker) LIKE UPPER(?) OR UPPER(Company_Name) LIKE UPPER(?)
+                LIMIT 5
+            """, (f'%{query}%', f'%{query}%'))
+            
+            nyse_results = cursor.fetchall()
+            for row in nyse_results:
+                results.append({
+                    'ticker': row[0],
+                    'name': row[1],
+                    'exchange': row[2]
+                })
+        
+        # Fetch current stock prices using yfinance
+        tickers = [result['ticker'] for result in results]
+        if tickers:
+            try:
+                import yfinance as yf
+                # Add suffix for yfinance if needed
+                yf_tickers = []
+                for ticker in tickers:
+                    if ticker.endswith('.K') or len(ticker) > 4:  # Handle special cases
+                        yf_tickers.append(ticker)
+                    else:
+                        yf_tickers.append(f"{ticker}")
+                
+                data = yf.download(yf_tickers, period='1d', interval='1d', progress=False)
+                
+                for i, result in enumerate(results):
+                    ticker = yf_tickers[i]
+                    if ticker in data['Close'].columns:
+                        current_price = data['Close'][ticker].iloc[-1]
+                        previous_close = data['Close'][ticker].iloc[-2] if len(data['Close'][ticker]) > 1 else current_price
+                        
+                        if pd.notna(current_price):
+                            result['price'] = float(current_price)
+                            change = current_price - previous_close
+                            change_percent = (change / previous_close) * 100 if previous_close != 0 else 0
+                            result['change'] = float(change)
+                            result['change_percent'] = float(change_percent)
+                        else:
+                            result['price'] = 'N/A'
+                            result['change'] = 0
+                            result['change_percent'] = 0
+                    else:
+                        result['price'] = 'N/A'
+                        result['change'] = 0
+                        result['change_percent'] = 0
+                        
+            except Exception as e:
+                print(f"Error fetching yfinance data: {e}")
+                # Set default values if yfinance fails
+                for result in results:
+                    result['price'] = 'N/A'
+                    result['change'] = 0
+                    result['change_percent'] = 0
+        
+        return jsonify(results)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     return send_from_directory('static', filename)
