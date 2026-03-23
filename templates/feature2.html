@@ -715,8 +715,9 @@
             // Clear global search results
             window.currentSearchResults = [];
             
-            // Reset selected stock
+            // Reset selected stock and search result
             selectedStock = null;
+            selectedSearchResultIndex = null;
             
             // Remove any selected highlights
             const tiles = document.querySelectorAll('.stock-tile');
@@ -760,7 +761,7 @@
             }
         }
 
-        function displaySearchResults(results) {
+        async function displaySearchResults(results) {
             const searchResultsContainer = document.getElementById('searchResultsContainer');
             
             if (results.length === 0) {
@@ -768,36 +769,18 @@
                 return;
             }
             
+            // Display results immediately without prices
             let html = '';
             results.forEach((stock, index) => {
-                const changeClass = stock.change >= 0 ? 'positive' : 'negative';
-                const changeSymbol = stock.change >= 0 ? '+' : '';
-                
-                let priceDisplay = stock.price;
-                if (stock.price === 'N/A' || stock.price === 'Error') {
-                    priceDisplay = stock.price;
-                } else {
-                    priceDisplay = `$${parseFloat(stock.price).toFixed(2)}`;
-                }
-                
-                let changeDisplay = '';
-                if (stock.price === 'N/A' || stock.price === 'Error') {
-                    changeDisplay = 'No data';
-                } else {
-                    changeDisplay = `${changeSymbol}${stock.change.toFixed(2)} (${changeSymbol}${stock.change_percent.toFixed(2)}%)`;
-                }
-                
                 html += `
-                    <div class="stock-tile selectable" onclick="addToPortfolio(${index})" data-stock-index="${index}">
+                    <div class="stock-tile selectable" onclick="selectSearchResult(${index})" data-index="${index}">
                         <div class="stock-tile-header">
                             <div class="stock-ticker">${stock.ticker}</div>
                             <div class="stock-exchange">${stock.exchange}</div>
                         </div>
                         <div class="stock-name">${stock.name}</div>
-                        <div class="stock-price">${priceDisplay}</div>
-                        <div class="stock-change ${stock.price === 'N/A' || stock.price === 'Error' ? '' : changeClass}">
-                            ${changeDisplay}
-                        </div>
+                        <div class="stock-price">Loading...</div>
+                        <div class="stock-change">Loading...</div>
                     </div>
                 `;
             });
@@ -806,6 +789,59 @@
             
             // Store search results globally for access in addToPortfolio function
             window.currentSearchResults = results;
+            
+            // Fetch stock prices asynchronously
+            fetchStockPrices(results);
+        }
+
+        async function fetchStockPrices(results) {
+            const tickers = results.map(stock => stock.ticker).join(',');
+            
+            try {
+                const response = await fetch(`/api/stock-prices?tickers=${encodeURIComponent(tickers)}`);
+                const prices = await response.json();
+                
+                if (response.ok) {
+                    // Update tiles with price information
+                    results.forEach((stock, index) => {
+                        const tile = document.querySelector(`[data-index="${index}"]`);
+                        if (tile && prices[stock.ticker]) {
+                            const priceData = prices[stock.ticker];
+                            const changeClass = priceData.change >= 0 ? 'positive' : 'negative';
+                            const changeSymbol = priceData.change >= 0 ? '+' : '';
+                            
+                            let priceDisplay = priceData.price;
+                            if (priceData.price === 'N/A' || priceData.price === 'Error') {
+                                priceDisplay = priceData.price;
+                            } else {
+                                priceDisplay = `$${parseFloat(priceData.price).toFixed(2)}`;
+                            }
+                            
+                            let changeDisplay = '';
+                            if (priceData.price === 'N/A' || priceData.price === 'Error') {
+                                changeDisplay = 'No data';
+                            } else {
+                                changeDisplay = `${changeSymbol}${priceData.change.toFixed(2)} (${changeSymbol}${priceData.change_percent.toFixed(2)}%)`;
+                            }
+                            
+                            tile.innerHTML = `
+                                <div class="stock-tile-header">
+                                    <div class="stock-ticker">${stock.ticker}</div>
+                                    <div class="stock-exchange">${stock.exchange}</div>
+                                </div>
+                                <div class="stock-name">${stock.name}</div>
+                                <div class="stock-price">${priceDisplay}</div>
+                                <div class="stock-change ${priceData.price === 'N/A' || priceData.price === 'Error' ? '' : changeClass}">
+                                    ${changeDisplay}
+                                </div>
+                            `;
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error fetching stock prices:', error);
+                // Keep "Loading..." state if price fetch fails
+            }
         }
 
         async function addToPortfolio(index) {
@@ -870,7 +906,31 @@
             }, 3000);
         }
 
+        // Track selected search result
+        let selectedSearchResultIndex = null;
+
+        function selectSearchResult(index) {
+            // Remove previous selection
+            const tiles = document.querySelectorAll('.stock-tile');
+            tiles.forEach(tile => tile.classList.remove('selected'));
+            
+            // Add selection to clicked tile
+            const selectedTile = document.querySelector(`[data-index="${index}"]`);
+            if (selectedTile) {
+                selectedTile.classList.add('selected');
+                selectedSearchResultIndex = index;
+            }
+        }
+
         function addStockToPortfolio() {
+            // Check if we have a selected search result
+            if (selectedSearchResultIndex !== null && window.currentSearchResults && window.currentSearchResults[selectedSearchResultIndex]) {
+                // Add the selected search result to portfolio
+                addToPortfolio(selectedSearchResultIndex);
+                return;
+            }
+            
+            // Fallback to old autocomplete system
             if (!selectedStock) {
                 // Try to find exact match from input
                 const inputText = document.getElementById('stockInput').value.trim();
@@ -882,7 +942,7 @@
             }
             
             if (!selectedStock) {
-                alert('Please select a valid stock from the suggestions');
+                alert('Please search for a stock and select it, or use the autocomplete suggestions');
                 return;
             }
             

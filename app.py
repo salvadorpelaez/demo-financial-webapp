@@ -5,6 +5,7 @@ import pandas as pd
 import requests
 import os
 from datetime import datetime
+import time
 from technical_indicators import indicators_bp
 
 app = Flask(__name__)
@@ -17,9 +18,76 @@ app.register_blueprint(indicators_bp)
 ALPHA_VANTAGE_API_KEY = os.environ.get('ALPHA_VANTAGE_API_KEY', 'demo')  # Use 'demo' for testing
 
 def get_db_connection():
-    conn = sqlite3.connect(r"c:\Users\salva\CascadeProjects\sp500-database-webapp\S&P500_Master.db")
+    conn = sqlite3.connect(r"c:\Users\salva\CascadeProjects\sp500-database-webapp\S&P500_Master.db", 
+                          timeout=10.0,  # Increase timeout to 10 seconds
+                          isolation_level='DEFERRED')  # Use deferred isolation for better concurrency
     conn.row_factory = sqlite3.Row
+    
+    # Enable WAL mode for better concurrent access
+    conn.execute("PRAGMA journal_mode=WAL")
+    # Set busy timeout to handle locks gracefully
+    conn.execute("PRAGMA busy_timeout=15000")  # 15 seconds
+    # Optimize for single-user access
+    conn.execute("PRAGMA synchronous=NORMAL")
+    # Set cache size for better performance
+    conn.execute("PRAGMA cache_size=10000")
+    
     return conn
+
+def get_search_connection():
+    """Get a dedicated connection for search operations"""
+    conn = sqlite3.connect(r"c:\Users\salva\CascadeProjects\sp500-database-webapp\database\search_cache.db", 
+                          timeout=5.0,  # Shorter timeout for search
+                          isolation_level='DEFERRED')  # Use deferred isolation
+    conn.row_factory = sqlite3.Row
+    
+    # Optimized settings for read-heavy search operations
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")  # 5 seconds
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA cache_size=5000")
+    conn.execute("PRAGMA temp_store=MEMORY")  # Use memory for temp tables
+    
+    return conn
+
+def get_stock_details(cursor, ticker):
+    """Get stock details from NYSE, NASDAQ, or Companies table"""
+    # Try NYSE first
+    cursor.execute("SELECT Ticker, Company_Name, 'NYSE' as exchange FROM NYSE WHERE Ticker = ?", (ticker,))
+    result = cursor.fetchone()
+    if result:
+        return {'ticker': result['Ticker'], 'name': result['Company_Name'], 'exchange': result['exchange']}
+    
+    # Try NASDAQ
+    cursor.execute("SELECT Symbol, CompanyName, 'NASDAQ' as exchange FROM NASDAQ WHERE Symbol = ?", (ticker,))
+    result = cursor.fetchone()
+    if result:
+        return {'ticker': result['Symbol'], 'name': result['CompanyName'], 'exchange': result['exchange']}
+    
+    # Try Companies (S&P 500)
+    cursor.execute("SELECT Ticker, Name, 'S&P 500' as exchange FROM Companies WHERE Ticker = ?", (ticker,))
+    result = cursor.fetchone()
+    if result:
+        return {'ticker': result['Ticker'], 'name': result['Name'], 'exchange': result['exchange']}
+    
+    return {'ticker': ticker, 'name': 'Unknown', 'exchange': 'Unknown'}
+
+def execute_with_retry(cursor, query, params=None, max_retries=5):
+    """Execute database query with retry logic for handling locks"""
+    for attempt in range(max_retries):
+        try:
+            if params:
+                cursor.execute(query, params)
+            else:
+                cursor.execute(query)
+            return  # Success, exit retry loop
+        except sqlite3.OperationalError as e:
+            if "database is locked" in str(e) and attempt < max_retries - 1:
+                print(f"Database locked, retrying... (attempt {attempt + 1}/{max_retries})")
+                time.sleep(0.2 * (attempt + 1))  # More aggressive backoff
+                continue
+            else:
+                raise  # Re-raise the error if max retries reached or different error
 
 @app.route('/')
 def index():
@@ -463,18 +531,25 @@ def search_stock():
     if not query:
         return jsonify({'error': 'Query parameter is required'}), 400
     
-    conn = get_db_connection()
+    conn = None
     try:
+        conn = get_search_connection()  # Use dedicated search connection
         cursor = conn.cursor()
         results = []
         
-        # First search NASDAQ table
-        cursor.execute("""
-            SELECT Symbol as ticker, CompanyName as name, 'NASDAQ' as exchange
-            FROM NASDAQ 
-            WHERE UPPER(Symbol) LIKE UPPER(?) OR UPPER(CompanyName) LIKE UPPER(?)
-            LIMIT 5
-        """, (f'%{query}%', f'%{query}%'))
+        # Search NASDAQ table
+        execute_with_retry(cursor, """
+            SELECT ticker, name, 'NASDAQ' as exchange
+            FROM nasdaq_search 
+            WHERE UPPER(ticker) LIKE UPPER(?) OR UPPER(name) LIKE UPPER(?)
+            ORDER BY 
+                CASE 
+                    WHEN UPPER(ticker) = UPPER(?) THEN 1
+                    WHEN UPPER(name) LIKE UPPER(?) THEN 2
+                    ELSE 3
+                END
+            LIMIT 10
+        """, (f'%{query}%', f'%{query}%', query, f'%{query}%'))
         
         nasdaq_results = cursor.fetchall()
         for row in nasdaq_results:
@@ -484,90 +559,134 @@ def search_stock():
                 'exchange': row[2]
             })
         
-        # If no results in NASDAQ, search NYSE table
-        if len(results) == 0:
-            cursor.execute("""
-                SELECT Ticker as ticker, Company_Name as name, 'NYSE' as exchange
-                FROM NYSE 
-                WHERE UPPER(Ticker) LIKE UPPER(?) OR UPPER(Company_Name) LIKE UPPER(?)
-                LIMIT 5
-            """, (f'%{query}%', f'%{query}%'))
-            
-            nyse_results = cursor.fetchall()
-            for row in nyse_results:
-                results.append({
-                    'ticker': row[0],
-                    'name': row[1],
-                    'exchange': row[2]
-                })
+        # Also search NYSE table (not conditional)
+        execute_with_retry(cursor, """
+            SELECT ticker, name, 'NYSE' as exchange
+            FROM nyse_search 
+            WHERE UPPER(ticker) LIKE UPPER(?) OR UPPER(name) LIKE UPPER(?)
+            ORDER BY 
+                CASE 
+                    WHEN UPPER(ticker) = UPPER(?) THEN 1
+                    WHEN UPPER(name) LIKE UPPER(?) THEN 2
+                    ELSE 3
+                END
+            LIMIT 10
+        """, (f'%{query}%', f'%{query}%', query, f'%{query}%'))
         
-        # Fetch current stock prices using yfinance
-        tickers = [result['ticker'] for result in results]
-        if tickers:
-            try:
-                import yfinance as yf
-                # Add suffix for yfinance if needed
-                yf_tickers = []
-                for ticker in tickers:
-                    if ticker.endswith('.K') or len(ticker) > 4:  # Handle special cases
-                        yf_tickers.append(ticker)
-                    else:
-                        yf_tickers.append(f"{ticker}")
-                
-                data = yf.download(yf_tickers, period='1d', interval='1d', progress=False)
-                
-                for i, result in enumerate(results):
-                    ticker = yf_tickers[i]
-                    if ticker in data['Close'].columns:
-                        current_price = data['Close'][ticker].iloc[-1]
-                        previous_close = data['Close'][ticker].iloc[-2] if len(data['Close'][ticker]) > 1 else current_price
-                        
-                        if pd.notna(current_price):
-                            result['price'] = float(current_price)
-                            change = current_price - previous_close
-                            change_percent = (change / previous_close) * 100 if previous_close != 0 else 0
-                            result['change'] = float(change)
-                            result['change_percent'] = float(change_percent)
-                        else:
-                            result['price'] = 'N/A'
-                            result['change'] = 0
-                            result['change_percent'] = 0
-                    else:
-                        result['price'] = 'N/A'
-                        result['change'] = 0
-                        result['change_percent'] = 0
-                        
-            except Exception as e:
-                print(f"Error fetching yfinance data: {e}")
-                # Set default values if yfinance fails
-                for result in results:
-                    result['price'] = 'N/A'
-                    result['change'] = 0
-                    result['change_percent'] = 0
+        nyse_results = cursor.fetchall()
+        for row in nyse_results:
+            results.append({
+                'ticker': row[0],
+                'name': row[1],
+                'exchange': row[2]
+            })
         
+        # Also search Companies table (S&P 500)
+        execute_with_retry(cursor, """
+            SELECT ticker, name, 'S&P 500' as exchange
+            FROM companies_search 
+            WHERE UPPER(ticker) LIKE UPPER(?) OR UPPER(name) LIKE UPPER(?)
+            ORDER BY 
+                CASE 
+                    WHEN UPPER(ticker) = UPPER(?) THEN 1
+                    WHEN UPPER(name) LIKE UPPER(?) THEN 2
+                    ELSE 3
+                END
+            LIMIT 10
+        """, (f'%{query}%', f'%{query}%', query, f'%{query}%'))
+        
+        sp500_results = cursor.fetchall()
+        for row in sp500_results:
+            results.append({
+                'ticker': row[0],
+                'name': row[1],
+                'exchange': row[2]
+            })
+        
+        # Return results immediately without waiting for yfinance prices
+        # Stock prices will be fetched on the frontend asynchronously
         return jsonify(results)
         
     except Exception as e:
+        print(f"Error in search: {e}")
         return jsonify({'error': str(e)}), 500
     finally:
-        conn.close()
+        if conn:
+            conn.close()
+
+@app.route('/api/stock-prices')
+def get_stock_prices():
+    """Get stock prices for multiple tickers asynchronously"""
+    tickers = request.args.get('tickers', '').split(',')
+    tickers = [t.strip() for t in tickers if t.strip()]
+    
+    if not tickers:
+        return jsonify({'error': 'No tickers provided'}), 400
+    
+    try:
+        import yfinance as yf
+        
+        # Add suffix for yfinance if needed
+        yf_tickers = []
+        for ticker in tickers:
+            if ticker.endswith('.K') or len(ticker) > 4:  # Handle special cases
+                yf_tickers.append(ticker)
+            else:
+                yf_tickers.append(f"{ticker}")
+        
+        data = yf.download(yf_tickers, period='2d', interval='1d', progress=False, timeout=5)
+        
+        prices = {}
+        for i, ticker in enumerate(tickers):
+            yf_ticker = yf_tickers[i]
+            if yf_ticker in data['Close'].columns:
+                current_price = data['Close'][yf_ticker].iloc[-1]
+                previous_close = data['Close'][yf_ticker].iloc[-2] if len(data['Close'][yf_ticker]) > 1 else current_price
+                
+                if pd.notna(current_price):
+                    change = current_price - previous_close
+                    change_percent = (change / previous_close) * 100 if previous_close != 0 else 0
+                    prices[ticker] = {
+                        'price': float(current_price),
+                        'change': float(change),
+                        'change_percent': float(change_percent)
+                    }
+                else:
+                    prices[ticker] = {
+                        'price': 'N/A',
+                        'change': 0,
+                        'change_percent': 0
+                    }
+            else:
+                prices[ticker] = {
+                    'price': 'N/A',
+                    'change': 0,
+                    'change_percent': 0
+                }
+        
+        return jsonify(prices)
+        
+    except Exception as e:
+        print(f"Error fetching stock prices: {e}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/add-to-portfolio', methods=['POST'])
 def add_to_portfolio():
     """Add a stock to the test_user's portfolio in database"""
+    data = request.get_json()
+    
+    if not data or 'ticker' not in data:
+        return jsonify({'error': 'Ticker is required'}), 400
+    
+    ticker = data['ticker']
+    name = data['name']
+    exchange = data['exchange']
+    price = data.get('price', 0)
+    change = data.get('change', 0)
+    change_percent = data.get('change_percent', 0)
+    
+    conn = None
     try:
-        data = request.get_json()
-        
-        if not data or 'ticker' not in data:
-            return jsonify({'error': 'Ticker is required'}), 400
-        
-        ticker = data['ticker']
-        name = data['name']
-        exchange = data['exchange']
-        price = data.get('price', 0)
-        change = data.get('change', 0)
-        change_percent = data.get('change_percent', 0)
-        
         conn = get_db_connection()
         cursor = conn.cursor()
         
@@ -576,7 +695,6 @@ def add_to_portfolio():
         user = cursor.fetchone()
         
         if not user:
-            conn.close()
             return jsonify({'error': 'Test user not found'}), 404
         
         user_id = user['id']
@@ -586,46 +704,47 @@ def add_to_portfolio():
         existing = cursor.fetchone()
         
         if existing:
-            # Update existing stock with latest data
+            # Update existing stock (update timestamp and shares if needed)
             cursor.execute('''
                 UPDATE portfolio 
-                SET company_name = ?, exchange = ?, price = ?, change = ?, change_percent = ?, added_at = CURRENT_TIMESTAMP
+                SET added_at = CURRENT_TIMESTAMP
                 WHERE user_id = ? AND ticker = ?
-            ''', (name, exchange, price, change, change_percent, user_id, ticker))
+            ''', (user_id, ticker))
             message = f"{ticker} updated in portfolio"
         else:
             # Insert new stock
             cursor.execute('''
-                INSERT INTO portfolio (user_id, ticker, company_name, exchange, price, change, change_percent)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            ''', (user_id, ticker, name, exchange, price, change, change_percent))
+                INSERT INTO portfolio (user_id, ticker, shares)
+                VALUES (?, ?, 1.0)
+            ''', (user_id, ticker))
             message = f"{ticker} added to portfolio"
         
         conn.commit()
         
         # Get updated portfolio for test_user
         cursor.execute('''
-            SELECT ticker, company_name, exchange, price, change, change_percent, added_at
+            SELECT ticker, shares, added_at
             FROM portfolio
             WHERE user_id = ?
             ORDER BY added_at DESC
         ''', (user_id,))
         portfolio = cursor.fetchall()
         
-        # Convert to list of dictionaries
+        # Convert to list of dictionaries and fetch stock info from original tables
         portfolio_list = []
         for stock in portfolio:
+            # Get stock details from the appropriate table
+            stock_details = get_stock_details(cursor, stock['ticker'])
+            
             portfolio_list.append({
                 'ticker': stock['ticker'],
-                'name': stock['company_name'],
-                'exchange': stock['exchange'],
-                'price': stock['price'],
-                'change': stock['change'],
-                'change_percent': stock['change_percent'],
+                'name': stock_details.get('name', 'Unknown'),
+                'exchange': stock_details.get('exchange', 'Unknown'),
+                'price': stock_details.get('price', 0),
+                'change': stock_details.get('change', 0),
+                'change_percent': stock_details.get('change_percent', 0),
                 'added_at': stock['added_at']
             })
-        
-        conn.close()
         
         return jsonify({
             'success': True,
@@ -637,6 +756,9 @@ def add_to_portfolio():
     except Exception as e:
         print(f"Error adding to portfolio: {e}")
         return jsonify({'error': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 @app.route('/api/get-portfolio')
 def get_portfolio():
@@ -656,23 +778,26 @@ def get_portfolio():
         user_id = user['id']
         
         cursor.execute('''
-            SELECT ticker, company_name, exchange, price, change, change_percent, added_at
+            SELECT ticker, shares, added_at
             FROM portfolio
             WHERE user_id = ?
             ORDER BY added_at DESC
         ''', (user_id,))
         portfolio = cursor.fetchall()
         
-        # Convert to list of dictionaries
+        # Convert to list of dictionaries and fetch stock info from original tables
         portfolio_list = []
         for stock in portfolio:
+            # Get stock details from the appropriate table
+            stock_details = get_stock_details(cursor, stock['ticker'])
+            
             portfolio_list.append({
                 'ticker': stock['ticker'],
-                'name': stock['company_name'],
-                'exchange': stock['exchange'],
-                'price': stock['price'],
-                'change': stock['change'],
-                'change_percent': stock['change_percent'],
+                'name': stock_details.get('name', 'Unknown'),
+                'exchange': stock_details.get('exchange', 'Unknown'),
+                'price': stock_details.get('price', 0),
+                'change': stock_details.get('change', 0),
+                'change_percent': stock_details.get('change_percent', 0),
                 'added_at': stock['added_at']
             })
         
@@ -690,62 +815,62 @@ def get_portfolio():
 @app.route('/api/remove-from-portfolio', methods=['DELETE'])
 def remove_from_portfolio():
     """Remove a stock from the test_user's portfolio in database"""
+    data = request.get_json()
+    
+    if not data or 'ticker' not in data:
+        return jsonify({'error': 'Ticker is required'}), 400
+    
+    ticker = data['ticker']
+    
+    conn = None
     try:
-        data = request.get_json()
-        
-        if not data or 'ticker' not in data:
-            return jsonify({'error': 'Ticker is required'}), 400
-        
-        ticker = data['ticker']
-        
         conn = get_db_connection()
         cursor = conn.cursor()
         
         # Get test_user ID
-        cursor.execute("SELECT id FROM users WHERE username = 'test_user'")
+        execute_with_retry(cursor, "SELECT id FROM users WHERE username = 'test_user'")
         user = cursor.fetchone()
         
         if not user:
-            conn.close()
             return jsonify({'error': 'Test user not found'}), 404
         
         user_id = user['id']
         
         # Check if stock exists in user's portfolio
-        cursor.execute("SELECT ticker FROM portfolio WHERE user_id = ? AND ticker = ?", (user_id, ticker))
+        execute_with_retry(cursor, "SELECT ticker FROM portfolio WHERE user_id = ? AND ticker = ?", (user_id, ticker))
         existing = cursor.fetchone()
         
         if not existing:
-            conn.close()
             return jsonify({'error': 'Stock not found in portfolio'}), 404
         
         # Remove the stock
-        cursor.execute("DELETE FROM portfolio WHERE user_id = ? AND ticker = ?", (user_id, ticker))
+        execute_with_retry(cursor, "DELETE FROM portfolio WHERE user_id = ? AND ticker = ?", (user_id, ticker))
         conn.commit()
         
         # Get updated portfolio for test_user
-        cursor.execute('''
-            SELECT ticker, company_name, exchange, price, change, change_percent, added_at
+        execute_with_retry(cursor, '''
+            SELECT ticker, shares, added_at
             FROM portfolio
             WHERE user_id = ?
             ORDER BY added_at DESC
         ''', (user_id,))
         portfolio = cursor.fetchall()
         
-        # Convert to list of dictionaries
+        # Convert to list of dictionaries and fetch stock info from original tables
         portfolio_list = []
         for stock in portfolio:
+            # Get stock details from the appropriate table
+            stock_details = get_stock_details(cursor, stock['ticker'])
+            
             portfolio_list.append({
                 'ticker': stock['ticker'],
-                'name': stock['company_name'],
-                'exchange': stock['exchange'],
-                'price': stock['price'],
-                'change': stock['change'],
-                'change_percent': stock['change_percent'],
+                'name': stock_details.get('name', 'Unknown'),
+                'exchange': stock_details.get('exchange', 'Unknown'),
+                'price': stock_details.get('price', 0),
+                'change': stock_details.get('change', 0),
+                'change_percent': stock_details.get('change_percent', 0),
                 'added_at': stock['added_at']
             })
-        
-        conn.close()
         
         return jsonify({
             'success': True,
@@ -757,6 +882,9 @@ def remove_from_portfolio():
     except Exception as e:
         print(f"Error removing from portfolio: {e}")
         return jsonify({'error': str(e)}), 500
+    finally:
+        if conn:
+            conn.close()
 
 @app.route('/stock-graph')
 def stock_graph():
