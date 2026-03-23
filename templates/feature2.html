@@ -403,6 +403,80 @@
             border-color: #f5c6cb;
         }
 
+        .current-portfolio {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 12px;
+            border: 1px solid #dee2e6;
+        }
+
+        .current-portfolio h3 {
+            margin-bottom: 10px;
+            color: #2c3e50;
+            font-size: 20px;
+        }
+
+        .portfolio-count {
+            margin-bottom: 20px;
+            color: #6c757d;
+            font-size: 14px;
+        }
+
+        .portfolio-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .portfolio-item {
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border: 1px solid #dee2e6;
+            transition: all 0.3s ease;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .portfolio-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+        }
+
+        .portfolio-item.deletable {
+            border: 2px solid transparent;
+        }
+
+        .portfolio-item.deletable:hover {
+            border-color: #dc3545;
+        }
+
+        .delete-hint {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: #dc3545;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .portfolio-item:hover .delete-hint {
+            opacity: 1;
+        }
+
+        .empty-portfolio {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+            font-style: italic;
+        }
+
         .stock-tile.selectable {
             cursor: pointer;
             border: 2px solid transparent;
@@ -485,6 +559,12 @@
             <div id="searchResults" class="search-results" style="display: none;">
                 <h3>Search Results</h3>
                 <div id="searchResultsContainer" class="search-results-container"></div>
+            </div>
+
+            <div id="currentPortfolio" class="current-portfolio" style="display: none;">
+                <h3>Current Portfolio</h3>
+                <p id="portfolioCount" class="portfolio-count"></p>
+                <div id="portfolioContainer" class="portfolio-container"></div>
             </div>
 
             <div class="footer-text">
@@ -823,6 +903,163 @@
                 document.getElementById('stockSuggestions').style.display = 'none';
             }
         });
+
+        // Load portfolio when page loads
+        window.addEventListener('load', loadCurrentPortfolio);
+
+        // Load portfolio after adding stock
+        async function addToPortfolio(index) {
+            const stock = window.currentSearchResults[index];
+            
+            if (!stock) {
+                console.error('Stock data not found');
+                return;
+            }
+            
+            try {
+                // Add stock to portfolio via API
+                const response = await fetch('/api/add-to-portfolio', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        ticker: stock.ticker,
+                        name: stock.name,
+                        exchange: stock.exchange,
+                        price: stock.price,
+                        change: stock.change,
+                        change_percent: stock.change_percent
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    // Show success notification
+                    showPortfolioNotification(`${stock.name} has been added to your dashboard`);
+                    
+                    // Highlight the selected tile
+                    const tiles = document.querySelectorAll('.stock-tile');
+                    tiles.forEach(tile => tile.classList.remove('selected'));
+                    tiles[index].classList.add('selected');
+                    
+                    // Reload portfolio display
+                    await loadCurrentPortfolio();
+                } else {
+                    throw new Error(result.error || 'Failed to add to portfolio');
+                }
+            } catch (error) {
+                console.error('Error adding to portfolio:', error);
+                showPortfolioNotification(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // Load current portfolio
+        async function loadCurrentPortfolio() {
+            try {
+                const response = await fetch('/api/get-portfolio');
+                const data = await response.json();
+                
+                if (response.ok) {
+                    displayCurrentPortfolio(data.portfolio);
+                } else {
+                    throw new Error(data.error || 'Failed to load portfolio');
+                }
+            } catch (error) {
+                console.error('Error loading portfolio:', error);
+            }
+        }
+
+        // Display current portfolio
+        function displayCurrentPortfolio(portfolio) {
+            const portfolioSection = document.getElementById('currentPortfolio');
+            const portfolioContainer = document.getElementById('portfolioContainer');
+            const portfolioCount = document.getElementById('portfolioCount');
+            
+            if (!portfolio || portfolio.length === 0) {
+                portfolioSection.style.display = 'none';
+                return;
+            }
+            
+            portfolioSection.style.display = 'block';
+            portfolioCount.textContent = `You have ${portfolio.length} stock${portfolio.length === 1 ? '' : 's'} in your portfolio`;
+            
+            let html = '';
+            portfolio.forEach(stock => {
+                const changeClass = stock.change >= 0 ? 'positive' : 'negative';
+                const changeSymbol = stock.change >= 0 ? '+' : '';
+                
+                let priceDisplay = stock.price;
+                if (stock.price === 'N/A' || stock.price === 'Error') {
+                    priceDisplay = stock.price;
+                } else {
+                    priceDisplay = `$${parseFloat(stock.price).toFixed(2)}`;
+                }
+                
+                let changeDisplay = '';
+                if (stock.price === 'N/A' || stock.price === 'Error') {
+                    changeDisplay = 'No data';
+                } else {
+                    changeDisplay = `${changeSymbol}${stock.change.toFixed(2)} (${changeSymbol}${stock.change_percent.toFixed(2)}%)`;
+                }
+                
+                html += `
+                    <div class="portfolio-item deletable" 
+                         oncontextmenu="removeFromPortfolio('${stock.ticker}', event)"
+                         onclick="viewStockGraph('${stock.ticker}', '${stock.name.replace(/'/g, "\\'")}', '${stock.exchange}')">
+                        <div class="delete-hint">Right-click to remove</div>
+                        <div class="stock-tile-header">
+                            <div class="stock-ticker">${stock.ticker}</div>
+                            <div class="stock-exchange">${stock.exchange}</div>
+                        </div>
+                        <div class="stock-name">${stock.name}</div>
+                        <div class="stock-price">${priceDisplay}</div>
+                        <div class="stock-change ${stock.price === 'N/A' || stock.price === 'Error' ? '' : changeClass}">
+                            ${changeDisplay}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            portfolioContainer.innerHTML = html;
+        }
+
+        // Remove stock from portfolio
+        async function removeFromPortfolio(ticker, event) {
+            event.preventDefault(); // Prevent context menu
+            
+            if (!confirm(`Remove ${ticker} from your portfolio?`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/remove-from-portfolio', {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ ticker: ticker })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    showPortfolioNotification(`${ticker} has been removed from your dashboard`);
+                    await loadCurrentPortfolio();
+                } else {
+                    throw new Error(result.error || 'Failed to remove from portfolio');
+                }
+            } catch (error) {
+                console.error('Error removing from portfolio:', error);
+                showPortfolioNotification(`Error: ${error.message}`, 'error');
+            }
+        }
+
+        // View stock graph (reuse function from main page)
+        function viewStockGraph(ticker, name, exchange) {
+            window.location.href = `/stock-graph?ticker=${encodeURIComponent(ticker)}&name=${encodeURIComponent(name)}&exchange=${encodeURIComponent(exchange)}`;
+        }
     </script>
 </body>
 </html>

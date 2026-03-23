@@ -554,65 +554,208 @@ def search_stock():
 
 @app.route('/api/add-to-portfolio', methods=['POST'])
 def add_to_portfolio():
-    """Add a stock to the user's portfolio"""
+    """Add a stock to the test_user's portfolio in database"""
     try:
         data = request.get_json()
         
-        if not data:
-            return jsonify({'error': 'No data provided'}), 400
+        if not data or 'ticker' not in data:
+            return jsonify({'error': 'Ticker is required'}), 400
         
-        required_fields = ['ticker', 'name', 'exchange', 'price', 'change', 'change_percent']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'error': f'Missing required field: {field}'}), 400
+        ticker = data['ticker']
+        name = data['name']
+        exchange = data['exchange']
+        price = data.get('price', 0)
+        change = data.get('change', 0)
+        change_percent = data.get('change_percent', 0)
         
-        # For now, we'll store the portfolio in a simple list
-        # In a real application, you'd store this in a database with user authentication
+        conn = get_db_connection()
+        cursor = conn.cursor()
         
-        # Initialize portfolio list if it doesn't exist
-        if not hasattr(add_to_portfolio, 'portfolio'):
-            add_to_portfolio.portfolio = []
+        # Get test_user ID
+        cursor.execute("SELECT id FROM users WHERE username = 'test_user'")
+        user = cursor.fetchone()
         
-        # Check if stock already exists in portfolio
-        for stock in add_to_portfolio.portfolio:
-            if stock['ticker'] == data['ticker']:
-                return jsonify({'error': 'Stock already in portfolio'}), 400
+        if not user:
+            conn.close()
+            return jsonify({'error': 'Test user not found'}), 404
         
-        # Add stock to portfolio
-        portfolio_stock = {
-            'ticker': data['ticker'],
-            'name': data['name'],
-            'exchange': data['exchange'],
-            'price': data['price'],
-            'change': data['change'],
-            'change_percent': data['change_percent'],
-            'added_at': pd.Timestamp.now().isoformat()
-        }
+        user_id = user['id']
         
-        add_to_portfolio.portfolio.append(portfolio_stock)
+        # Check if stock already exists in user's portfolio
+        cursor.execute("SELECT ticker FROM portfolio WHERE user_id = ? AND ticker = ?", (user_id, ticker))
+        existing = cursor.fetchone()
+        
+        if existing:
+            # Update existing stock with latest data
+            cursor.execute('''
+                UPDATE portfolio 
+                SET company_name = ?, exchange = ?, price = ?, change = ?, change_percent = ?, added_at = CURRENT_TIMESTAMP
+                WHERE user_id = ? AND ticker = ?
+            ''', (name, exchange, price, change, change_percent, user_id, ticker))
+            message = f"{ticker} updated in portfolio"
+        else:
+            # Insert new stock
+            cursor.execute('''
+                INSERT INTO portfolio (user_id, ticker, company_name, exchange, price, change, change_percent)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (user_id, ticker, name, exchange, price, change, change_percent))
+            message = f"{ticker} added to portfolio"
+        
+        conn.commit()
+        
+        # Get updated portfolio for test_user
+        cursor.execute('''
+            SELECT ticker, company_name, exchange, price, change, change_percent, added_at
+            FROM portfolio
+            WHERE user_id = ?
+            ORDER BY added_at DESC
+        ''', (user_id,))
+        portfolio = cursor.fetchall()
+        
+        # Convert to list of dictionaries
+        portfolio_list = []
+        for stock in portfolio:
+            portfolio_list.append({
+                'ticker': stock['ticker'],
+                'name': stock['company_name'],
+                'exchange': stock['exchange'],
+                'price': stock['price'],
+                'change': stock['change'],
+                'change_percent': stock['change_percent'],
+                'added_at': stock['added_at']
+            })
+        
+        conn.close()
         
         return jsonify({
             'success': True,
-            'message': f"{data['name']} added to portfolio",
-            'portfolio_size': len(add_to_portfolio.portfolio)
+            'message': message,
+            'portfolio': portfolio_list,
+            'size': len(portfolio_list)
         })
         
     except Exception as e:
+        print(f"Error adding to portfolio: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/get-portfolio')
 def get_portfolio():
-    """Get the user's current portfolio"""
+    """Get the test_user's portfolio from database"""
     try:
-        if not hasattr(add_to_portfolio, 'portfolio'):
-            add_to_portfolio.portfolio = []
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get test_user ID
+        cursor.execute("SELECT id FROM users WHERE username = 'test_user'")
+        user = cursor.fetchone()
+        
+        if not user:
+            conn.close()
+            return jsonify({'portfolio': [], 'size': 0})
+        
+        user_id = user['id']
+        
+        cursor.execute('''
+            SELECT ticker, company_name, exchange, price, change, change_percent, added_at
+            FROM portfolio
+            WHERE user_id = ?
+            ORDER BY added_at DESC
+        ''', (user_id,))
+        portfolio = cursor.fetchall()
+        
+        # Convert to list of dictionaries
+        portfolio_list = []
+        for stock in portfolio:
+            portfolio_list.append({
+                'ticker': stock['ticker'],
+                'name': stock['company_name'],
+                'exchange': stock['exchange'],
+                'price': stock['price'],
+                'change': stock['change'],
+                'change_percent': stock['change_percent'],
+                'added_at': stock['added_at']
+            })
+        
+        conn.close()
         
         return jsonify({
-            'portfolio': add_to_portfolio.portfolio,
-            'size': len(add_to_portfolio.portfolio)
+            'portfolio': portfolio_list,
+            'size': len(portfolio_list)
         })
         
     except Exception as e:
+        print(f"Error getting portfolio: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/remove-from-portfolio', methods=['DELETE'])
+def remove_from_portfolio():
+    """Remove a stock from the test_user's portfolio in database"""
+    try:
+        data = request.get_json()
+        
+        if not data or 'ticker' not in data:
+            return jsonify({'error': 'Ticker is required'}), 400
+        
+        ticker = data['ticker']
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        # Get test_user ID
+        cursor.execute("SELECT id FROM users WHERE username = 'test_user'")
+        user = cursor.fetchone()
+        
+        if not user:
+            conn.close()
+            return jsonify({'error': 'Test user not found'}), 404
+        
+        user_id = user['id']
+        
+        # Check if stock exists in user's portfolio
+        cursor.execute("SELECT ticker FROM portfolio WHERE user_id = ? AND ticker = ?", (user_id, ticker))
+        existing = cursor.fetchone()
+        
+        if not existing:
+            conn.close()
+            return jsonify({'error': 'Stock not found in portfolio'}), 404
+        
+        # Remove the stock
+        cursor.execute("DELETE FROM portfolio WHERE user_id = ? AND ticker = ?", (user_id, ticker))
+        conn.commit()
+        
+        # Get updated portfolio for test_user
+        cursor.execute('''
+            SELECT ticker, company_name, exchange, price, change, change_percent, added_at
+            FROM portfolio
+            WHERE user_id = ?
+            ORDER BY added_at DESC
+        ''', (user_id,))
+        portfolio = cursor.fetchall()
+        
+        # Convert to list of dictionaries
+        portfolio_list = []
+        for stock in portfolio:
+            portfolio_list.append({
+                'ticker': stock['ticker'],
+                'name': stock['company_name'],
+                'exchange': stock['exchange'],
+                'price': stock['price'],
+                'change': stock['change'],
+                'change_percent': stock['change_percent'],
+                'added_at': stock['added_at']
+            })
+        
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'message': f"{ticker} removed from portfolio",
+            'portfolio': portfolio_list,
+            'portfolio_size': len(portfolio_list)
+        })
+        
+    except Exception as e:
+        print(f"Error removing from portfolio: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/stock-graph')
