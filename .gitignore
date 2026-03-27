@@ -36,6 +36,9 @@ ENV/
 .DS_Store
 Thumbs.db
 
+# Environment variables - never commit
+.env
+
 # Flask
 instance/
 .webassets-cache

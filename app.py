@@ -4,9 +4,20 @@ import yfinance as yf
 import pandas as pd
 import requests
 import os
+import threading
 from datetime import datetime
 import time
 from technical_indicators import indicators_bp
+from supabase import create_client
+from agents.router import run_valuation
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Supabase client
+_supabase_url = os.getenv("SUPABASE_URL")
+_supabase_key = os.getenv("SUPABASE_KEY")
+supabase_client = create_client(_supabase_url, _supabase_key) if _supabase_url and _supabase_key else None
 
 app = Flask(__name__)
 
@@ -17,8 +28,10 @@ app.register_blueprint(indicators_bp)
 # Get free key from: https://www.alphavantage.co/support/#api-key
 ALPHA_VANTAGE_API_KEY = os.environ.get('ALPHA_VANTAGE_API_KEY', 'demo')  # Use 'demo' for testing
 
+DB_PATH = os.path.join(os.path.dirname(__file__), "S&P500_Master.db")
+
 def get_db_connection():
-    conn = sqlite3.connect(r"c:\Users\salva\CascadeProjects\sp500-database-webapp\S&P500_Master.db", 
+    conn = sqlite3.connect(DB_PATH,
                           timeout=10.0,  # Increase timeout to 10 seconds
                           isolation_level='DEFERRED')  # Use deferred isolation for better concurrency
     conn.row_factory = sqlite3.Row
@@ -619,46 +632,45 @@ def get_stock_prices():
     """Get stock prices for multiple tickers asynchronously"""
     tickers = request.args.get('tickers', '').split(',')
     tickers = [t.strip() for t in tickers if t.strip()]
-    
+
     if not tickers:
         return jsonify({'error': 'No tickers provided'}), 400
-    
-    try:
-        import yfinance as yf
-        
-        # Add suffix for yfinance if needed
-        yf_tickers = []
-        for ticker in tickers:
-            if ticker.endswith('.K') or len(ticker) > 4:  # Handle special cases
-                yf_tickers.append(ticker)
-            else:
-                yf_tickers.append(f"{ticker}")
-        
-        data = yf.download(yf_tickers, period='2d', interval='1d', progress=False, timeout=5)
-        
-        prices = {}
-        for i, ticker in enumerate(tickers):
-            yf_ticker = yf_tickers[i]
-            if yf_ticker in data['Close'].columns:
-                current_price = data['Close'][yf_ticker].iloc[-1]
-                previous_close = data['Close'][yf_ticker].iloc[-2] if len(data['Close'][yf_ticker]) > 1 else current_price
-                
-                if pd.notna(current_price):
-                    change = current_price - previous_close
-                    change_percent = (change / previous_close) * 100 if previous_close != 0 else 0
-                    prices[ticker] = {
-                        'price': float(current_price),
-                        'change': float(change),
-                        'change_percent': float(change_percent)
-                    }
-                else:
-                    prices[ticker] = {
-                        'price': 'N/A',
-                        'change': 0,
-                        'change_percent': 0
-                    }
-            else:
+
+    prices = {}
+    for ticker in tickers:
+        try:
+            t = yf.Ticker(ticker)
+            hist = t.history(period='2d')
+            if not hist.empty and len(hist) >= 1:
+                current_price = float(hist['Close'].iloc[-1])
+                previous_close = float(hist['Close'].iloc[-2]) if len(hist) >= 2 else current_price
+                change = current_price - previous_close
+                change_percent = (change / previous_close * 100) if previous_close != 0 else 0
                 prices[ticker] = {
+                    'price': round(current_price, 2),
+                    'change': round(change, 2),
+                    'change_percent': round(change_percent, 2)
+                }
+            else:
+                prices[ticker] = {'price': 'N/A', 'change': 0, 'change_percent': 0}
+        except Exception:
+            prices[ticker] = {'price': 'N/A', 'change': 0, 'change_percent': 0}
+
+    return jsonify(prices)
+
+@app.route('/api/stock-prices-legacy')
+def get_stock_prices_legacy():
+    """Legacy endpoint kept for compatibility"""
+    tickers = request.args.get('tickers', '').split(',')
+    tickers = [t.strip() for t in tickers if t.strip()]
+
+    if not tickers:
+        return jsonify({'error': 'No tickers provided'}), 400
+
+    try:
+        prices = {}
+        for ticker in tickers:
+            prices[ticker] = {
                     'price': 'N/A',
                     'change': 0,
                     'change_percent': 0
@@ -968,5 +980,137 @@ def get_stock_data():
 def serve_static(filename):
     return send_from_directory('static', filename)
 
+@app.route('/portfolio')
+def portfolio_page():
+    return render_template('portfolio.html')
+
+
+@app.route('/api/investable-stocks')
+def get_investable_stocks():
+    """Get VALUE and HYPERGROWTH stocks from the Companies table"""
+    conn = get_db_connection()
+    try:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT Ticker, Name, Sector, Sub_Sector, Classification, Primary_Reason
+            FROM Companies
+            WHERE Classification IN ('VALUE', 'HYPERGROWTH')
+            ORDER BY Classification, Name
+        """)
+        rows = cursor.fetchall()
+        stocks = [{
+            'ticker': r['Ticker'],
+            'name': r['Name'],
+            'sector': r['Sector'],
+            'sub_sector': r['Sub_Sector'],
+            'classification': r['Classification'],
+            'primary_reason': r['Primary_Reason']
+        } for r in rows]
+        return jsonify({'stocks': stocks, 'total': len(stocks)})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        conn.close()
+
+
+@app.route('/api/supabase-portfolio', methods=['GET'])
+def get_supabase_portfolio():
+    if not supabase_client:
+        return jsonify({'error': 'Supabase not configured'}), 500
+    try:
+        result = supabase_client.table('portfolio').select('*').order('created_at', desc=True).execute()
+        return jsonify({'portfolio': result.data})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/supabase-portfolio/add', methods=['POST'])
+def add_to_supabase_portfolio():
+    if not supabase_client:
+        return jsonify({'error': 'Supabase not configured'}), 500
+    data = request.get_json()
+    ticker = data.get('ticker')
+    if not ticker:
+        return jsonify({'error': 'Ticker required'}), 400
+    try:
+        existing = supabase_client.table('portfolio').select('id').eq('ticker', ticker).execute()
+        if existing.data:
+            return jsonify({'message': f'{ticker} already in portfolio'})
+        supabase_client.table('portfolio').insert({
+            'ticker': data.get('ticker'),
+            'name': data.get('name'),
+            'sector': data.get('sector'),
+            'classification': data.get('classification'),
+            'primary_reason': data.get('primary_reason')
+        }).execute()
+        return jsonify({'success': True, 'message': f'{ticker} added to portfolio'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/supabase-portfolio/remove', methods=['DELETE'])
+def remove_from_supabase_portfolio():
+    if not supabase_client:
+        return jsonify({'error': 'Supabase not configured'}), 500
+    data = request.get_json()
+    ticker = data.get('ticker')
+    if not ticker:
+        return jsonify({'error': 'Ticker required'}), 400
+    try:
+        supabase_client.table('portfolio').delete().eq('ticker', ticker).execute()
+        return jsonify({'success': True, 'message': f'{ticker} removed from portfolio'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/analyze/<ticker>', methods=['POST'])
+def analyze_stock(ticker):
+    """Trigger valuation analysis for a stock — runs in background thread"""
+    if not supabase_client:
+        return jsonify({'error': 'Supabase not configured'}), 500
+
+    data = request.get_json() or {}
+    company_name = data.get('name', ticker)
+    classification = data.get('classification', 'VALUE')
+    primary_reason = data.get('primary_reason', '')
+
+    def run_in_background():
+        try:
+            result = run_valuation(ticker, company_name, classification, primary_reason)
+            supabase_client.table('valuations').upsert({
+                'ticker': ticker,
+                'classification': result['classification'],
+                'report': result['report'],
+                'recommendation': result['recommendation'],
+                'summary': result['summary']
+            }, on_conflict='ticker').execute()
+            print(f"[analyze] Saved valuation for {ticker}", flush=True)
+        except Exception as e:
+            import traceback
+            print(f"[analyze] Error for {ticker}: {e}", flush=True)
+            traceback.print_exc()
+
+    thread = threading.Thread(target=run_in_background)
+    thread.daemon = True
+    thread.start()
+
+    return jsonify({'message': f'Analysis started for {ticker}. Check back in ~30 seconds.'})
+
+
+@app.route('/api/valuation/<ticker>', methods=['GET'])
+def get_valuation(ticker):
+    """Get saved valuation for a ticker from Supabase"""
+    if not supabase_client:
+        return jsonify({'error': 'Supabase not configured'}), 500
+    try:
+        result = supabase_client.table('valuations').select('*').eq('ticker', ticker).order('created_at', desc=True).limit(1).execute()
+        if result.data:
+            return jsonify({'valuation': result.data[0]})
+        return jsonify({'valuation': None})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    debug = os.getenv('FLASK_DEBUG', 'false').lower() == 'true'
+    app.run(debug=debug, port=5000)
