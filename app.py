@@ -104,7 +104,8 @@ def execute_with_retry(cursor, query, params=None, max_retries=5):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    from flask import redirect, url_for
+    return redirect(url_for('portfolio'))
 
 @app.route('/sp500')
 def sp500_page():
