@@ -36,13 +36,8 @@ def get_db_connection():
                           isolation_level='DEFERRED')  # Use deferred isolation for better concurrency
     conn.row_factory = sqlite3.Row
     
-    # Enable WAL mode for better concurrent access
-    conn.execute("PRAGMA journal_mode=WAL")
-    # Set busy timeout to handle locks gracefully
-    conn.execute("PRAGMA busy_timeout=15000")  # 15 seconds
-    # Optimize for single-user access
-    conn.execute("PRAGMA synchronous=NORMAL")
-    # Set cache size for better performance
+    # Use MEMORY journal mode (no file writes needed — safe for read-only filesystems)
+    conn.execute("PRAGMA journal_mode=MEMORY")
     conn.execute("PRAGMA cache_size=10000")
     
     return conn
@@ -54,12 +49,9 @@ def get_search_connection():
                           isolation_level='DEFERRED')  # Use deferred isolation
     conn.row_factory = sqlite3.Row
     
-    # Optimized settings for read-heavy search operations
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=5000")  # 5 seconds
-    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA journal_mode=MEMORY")
     conn.execute("PRAGMA cache_size=5000")
-    conn.execute("PRAGMA temp_store=MEMORY")  # Use memory for temp tables
+    conn.execute("PRAGMA temp_store=MEMORY")
     
     return conn
 
