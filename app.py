@@ -1074,27 +1074,21 @@ def analyze_stock(ticker):
     classification = data.get('classification', 'VALUE')
     primary_reason = data.get('primary_reason', '')
 
-    def run_in_background():
-        try:
-            result = run_valuation(ticker, company_name, classification, primary_reason)
-            supabase_client.table('valuations').upsert({
-                'ticker': ticker,
-                'classification': result['classification'],
-                'report': result['report'],
-                'recommendation': result['recommendation'],
-                'summary': result['summary']
-            }, on_conflict='ticker').execute()
-            print(f"[analyze] Saved valuation for {ticker}", flush=True)
-        except Exception as e:
-            import traceback
-            print(f"[analyze] Error for {ticker}: {e}", flush=True)
-            traceback.print_exc()
-
-    thread = threading.Thread(target=run_in_background)
-    thread.daemon = True
-    thread.start()
-
-    return jsonify({'message': f'Analysis started for {ticker}. Check back in ~30 seconds.'})
+    try:
+        result = run_valuation(ticker, company_name, classification, primary_reason)
+        supabase_client.table('valuations').upsert({
+            'ticker': ticker,
+            'classification': result['classification'],
+            'report': result['report'],
+            'recommendation': result['recommendation'],
+            'summary': result['summary']
+        }, on_conflict='ticker').execute()
+        print(f"[analyze] Saved valuation for {ticker}", flush=True)
+        return jsonify({'message': f'Analysis complete for {ticker}.', 'recommendation': result.get('recommendation', '')})
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/valuation/<ticker>', methods=['GET'])
