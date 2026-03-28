@@ -13,14 +13,24 @@
             padding: 20px;
         }
         .disclaimer {
-            background: #fff3cd;
-            border-bottom: 2px solid #ffc107;
-            padding: 10px 20px;
-            text-align: center;
-            font-size: 0.85em;
-            color: #856404;
+            background: #1a1a2e;
+            border-left: 5px solid #e74c3c;
+            padding: 14px 20px;
             border-radius: 8px;
             margin-bottom: 16px;
+        }
+        .disclaimer-title {
+            font-size: 0.95em;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .disclaimer-body {
+            font-size: 0.82em;
+            color: #ccc;
+            line-height: 1.5;
         }
         .container { max-width: 1400px; margin: 0 auto; }
         header {
@@ -147,6 +157,7 @@
             font-size: 12px;
             font-weight: 600;
             transition: background 0.2s;
+            white-space: nowrap;
         }
         .analyze-btn:hover { background: #5a6fd6; }
         .remove-btn {
@@ -174,17 +185,22 @@
             justify-content: space-between;
         }
         .valuation-body { padding: 24px; }
-        .rec-badge {
+        .signal-badge {
             display: inline-block;
-            padding: 4px 16px;
+            padding: 6px 18px;
             border-radius: 20px;
             font-weight: 700;
-            font-size: 1em;
-            margin-bottom: 12px;
+            font-size: 0.9em;
+            margin-bottom: 4px;
         }
-        .rec-buy { background: #d4edda; color: #155724; }
-        .rec-hold { background: #fff3cd; color: #856404; }
-        .rec-sell { background: #f8d7da; color: #721c24; }
+        .signal-positive { background: #d4edda; color: #155724; }
+        .signal-neutral  { background: #fff3cd; color: #856404; }
+        .signal-negative { background: #f8d7da; color: #721c24; }
+        .signal-disclaimer {
+            font-size: 0.75em;
+            color: #999;
+            margin-bottom: 16px;
+        }
         .report-text {
             white-space: pre-wrap;
             font-size: 13px;
@@ -195,6 +211,17 @@
             background: #f8f9fa;
             padding: 16px;
             border-radius: 8px;
+        }
+        .report-watermark {
+            margin-top: 16px;
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 6px;
+            padding: 10px 16px;
+            font-size: 0.8em;
+            color: #856404;
+            font-weight: 600;
+            text-align: center;
         }
         .loading { text-align: center; padding: 40px; color: #666; }
         .empty-state { text-align: center; padding: 40px; color: #999; }
@@ -212,18 +239,103 @@
             z-index: 1000;
         }
         .toast.show { opacity: 1; }
+
+        /* Consent Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 480px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal-icon {
+            font-size: 2em;
+            margin-bottom: 12px;
+        }
+        .modal h2 {
+            font-size: 1.15em;
+            font-weight: 800;
+            color: #1a1a2e;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .modal p {
+            font-size: 0.9em;
+            color: #444;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .modal-confirm {
+            flex: 1;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .modal-confirm:hover { background: #1a252f; }
+        .modal-cancel {
+            flex: 1;
+            background: #f0f0f0;
+            color: #666;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
+    <!-- Consent Modal -->
+    <div class="modal-overlay" id="consentModal">
+        <div class="modal">
+            <div class="modal-icon">⚠️</div>
+            <h2>Important Disclaimer</h2>
+            <p><strong>This tool is an AI classification model for educational and demonstration purposes only.</strong></p>
+            <p>It processes historical financial data to generate directional signals. The output — including any POSITIVE, NEGATIVE, or NEUTRAL signals — is a <strong>model prediction, not financial advice</strong>.</p>
+            <p>Do not make any investment or financial decisions based on this output. Past data patterns do not guarantee future results.</p>
+            <div class="modal-actions">
+                <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+                <button class="modal-confirm" onclick="confirmAndAnalyze()">I Understand — Generate Signal</button>
+            </div>
+        </div>
+    </div>
+
     <div class="container">
         <div class="disclaimer">
-            ⚠️ <strong>DEMO ONLY</strong> — For educational purposes. Not financial advice. Do not make investment decisions based on this tool.
+            <div class="disclaimer-title">⚡ AI Classification Model — Educational Demo</div>
+            <div class="disclaimer-body">
+                This application uses an AI model to classify historical stock data into directional signals (POSITIVE / NEUTRAL / NEGATIVE).
+                It is a demonstration of machine learning applied to public market data.
+                <strong style="color:#fff"> This is not financial advice. Do not make investment decisions based on this tool.</strong>
+            </div>
         </div>
 
         <header>
             <div>
-                <h1>Value Analytics — Portfolio & AI Valuation</h1>
-                <p>Select VALUE or HYPERGROWTH stocks · Run AI analysis · Get Buy/Hold/Sell recommendation</p>
+                <h1>Value Analytics — Portfolio & AI Signal Classification</h1>
+                <p>Select VALUE or HYPERGROWTH stocks · Add to portfolio · Run AI classification model</p>
             </div>
             <a href="/" class="back-btn">← Back</a>
         </header>
@@ -262,13 +374,15 @@
         <div class="valuation-panel" id="valuationPanel" style="display:none">
             <div class="valuation-header">
                 <div>
-                    <strong id="valuationTicker"></strong> — AI Valuation Report
+                    <strong id="valuationTicker"></strong> — AI Model Output
                     <div style="font-size:0.85em;opacity:0.8;margin-top:4px" id="valuationClassification"></div>
                 </div>
-                <span id="valuationRec" class="rec-badge"></span>
             </div>
             <div class="valuation-body">
+                <div id="signalBadge" class="signal-badge"></div>
+                <div class="signal-disclaimer">Model Output — This is not investment advice</div>
                 <div id="valuationContent" class="report-text"></div>
+                <div class="report-watermark">⚠️ MODEL OUTPUT ONLY — NOT FINANCIAL ADVICE — FOR EDUCATIONAL AND DEMONSTRATION PURPOSES</div>
             </div>
         </div>
     </div>
@@ -281,6 +395,7 @@
         let portfolioMap = {};
         let currentFilter = 'ALL';
         let currentSearch = '';
+        let pendingAnalysisTicker = null;
 
         // Load stocks
         async function loadStocks() {
@@ -363,7 +478,7 @@
                         <div class="stock-name">${s.name}</div>
                     </div>
                     <div class="stock-price" id="price-${s.ticker}">...</div>
-                    <button class="analyze-btn" onclick="analyzeStock('${s.ticker}')">Analyze</button>
+                    <button class="analyze-btn" onclick="requestAnalysis('${s.ticker}')">Generate AI Signal</button>
                     <button class="remove-btn" onclick="removeFromPortfolio('${s.ticker}')">✕</button>
                 </div>
             `).join('');
@@ -412,37 +527,57 @@
             loadPortfolio();
         }
 
+        // Show consent modal before every analysis
+        function requestAnalysis(ticker) {
+            pendingAnalysisTicker = ticker;
+            document.getElementById('consentModal').classList.add('show');
+        }
+
+        function closeModal() {
+            pendingAnalysisTicker = null;
+            document.getElementById('consentModal').classList.remove('show');
+        }
+
+        function confirmAndAnalyze() {
+            document.getElementById('consentModal').classList.remove('show');
+            if (pendingAnalysisTicker) {
+                analyzeStock(pendingAnalysisTicker);
+                pendingAnalysisTicker = null;
+            }
+        }
+
         async function analyzeStock(ticker) {
             const stock = portfolioMap[ticker] || stockMap[ticker] || {ticker};
-            showToast(`Starting analysis for ${ticker}... (~30 seconds)`);
+            showToast(`Starting AI classification for ${ticker}... (~30 seconds)`);
 
-            // Check if we already have a cached valuation
+            // Check for cached result
             const existing = await fetch(`/api/valuation/${ticker}`);
             const existingData = await existing.json();
             if (existingData.valuation) {
                 displayValuation(ticker, existingData.valuation);
-                showToast('Loaded cached valuation');
+                showToast('Loaded cached model output');
                 return;
             }
 
             // Trigger new analysis
+            document.getElementById('valuationPanel').style.display = 'block';
+            document.getElementById('valuationTicker').textContent = ticker;
+            document.getElementById('valuationContent').textContent = 'AI model running classification... this takes ~30 seconds.';
+            document.getElementById('signalBadge').textContent = '';
+            document.getElementById('signalBadge').className = 'signal-badge';
+
             await fetch(`/api/analyze/${ticker}`, {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify(stock)
             });
 
-            // Poll for result
-            document.getElementById('valuationPanel').style.display = 'block';
-            document.getElementById('valuationTicker').textContent = ticker;
-            document.getElementById('valuationContent').textContent = 'Analysis running... this takes ~30 seconds.';
-
             pollForValuation(ticker, 0);
         }
 
         async function pollForValuation(ticker, attempts) {
             if (attempts > 20) {
-                document.getElementById('valuationContent').textContent = 'Analysis is taking longer than expected. Try clicking Analyze again.';
+                document.getElementById('valuationContent').textContent = 'Classification is taking longer than expected. Try clicking Generate AI Signal again.';
                 return;
             }
             const res = await fetch(`/api/valuation/${ticker}`);
@@ -454,14 +589,21 @@
             }
         }
 
+        function mapSignal(recommendation) {
+            const r = (recommendation || 'HOLD').toUpperCase();
+            if (r === 'BUY')  return { label: 'POSITIVE SIGNAL', cssClass: 'signal-positive' };
+            if (r === 'SELL') return { label: 'NEGATIVE SIGNAL', cssClass: 'signal-negative' };
+            return { label: 'NEUTRAL SIGNAL', cssClass: 'signal-neutral' };
+        }
+
         function displayValuation(ticker, v) {
             document.getElementById('valuationPanel').style.display = 'block';
             document.getElementById('valuationTicker').textContent = ticker;
-            document.getElementById('valuationClassification').textContent = v.classification + ' Framework';
-            const rec = v.recommendation || 'HOLD';
-            const recEl = document.getElementById('valuationRec');
-            recEl.textContent = rec;
-            recEl.className = `rec-badge rec-${rec.toLowerCase()}`;
+            document.getElementById('valuationClassification').textContent = v.classification + ' Framework — Classification Result';
+            const signal = mapSignal(v.recommendation);
+            const badgeEl = document.getElementById('signalBadge');
+            badgeEl.textContent = signal.label;
+            badgeEl.className = `signal-badge ${signal.cssClass}`;
             document.getElementById('valuationContent').textContent = v.report;
         }
 
