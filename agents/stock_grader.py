@@ -4,9 +4,9 @@ from .base import BaseAgent
 
 
 SYSTEM_PROMPT = """You are a disciplined value investing analyst trained in Warren Buffett's principles.
-You perform a structured analysis using real financial data and deliver a clear Buy / Hold / Sell recommendation.
+You perform a structured analysis using real financial data and generate a directional signal classification.
 Your audience is an intelligent non-specialist — explain every calculation clearly, avoid jargon, and always show your work.
-Use tables wherever possible. This analysis is for educational purposes only. It is not financial advice."""
+Use tables wherever possible. This is an AI classification model for educational purposes only. It is not financial advice."""
 
 
 class StockGrader(BaseAgent):
@@ -71,19 +71,19 @@ Perform a structured analysis covering:
 7. Management Quality
 
 End with:
-- RECOMMENDATION: BUY / HOLD / SELL
-- One-paragraph plain-English summary a non-specialist can act on
-- Disclaimer: This is for educational purposes only, not financial advice."""
+- MODEL SIGNAL: POSITIVE SIGNAL / NEUTRAL SIGNAL / NEGATIVE SIGNAL — Model Output — This is not investment advice
+- One-paragraph plain-English summary a non-specialist can understand
+- Disclaimer: This is an AI classification model for educational purposes only. It is not financial advice."""
 
         print(f"[StockGrader] Running VALUE analysis for {ticker}...")
         report = self.run(SYSTEM_PROMPT, user_prompt, max_tokens=4096)
 
         recommendation = "HOLD"
         for line in report.split('\n'):
-            if 'RECOMMENDATION:' in line.upper():
-                if 'BUY' in line.upper():
+            if 'MODEL SIGNAL:' in line.upper() or 'RECOMMENDATION:' in line.upper():
+                if 'POSITIVE' in line.upper() or 'BUY' in line.upper():
                     recommendation = "BUY"
-                elif 'SELL' in line.upper():
+                elif 'NEGATIVE' in line.upper() or 'SELL' in line.upper():
                     recommendation = "SELL"
                 break
 
