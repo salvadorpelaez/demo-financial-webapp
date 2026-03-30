@@ -50,3 +50,22 @@ instance/
 
 # Logs
 *.log
+
+# Backup databases
+*_backup*.db
+*.sqbpro
+
+# Raw data files
+*.csv
+*.xls
+imported equities/
+raw CVS files/
+
+# Debug and test scripts
+check_*.py
+debug_*.py
+fix_*.py
+verify_*.py
+test_*.py
+populate_*.py
+
