@@ -11,14 +11,6 @@
       "dest": "/static/$1"
     },
     {
-      "src": "/portfolio",
-      "dest": "/static/portfolio.html"
-    },
-    {
-      "src": "/",
-      "dest": "/static/portfolio.html"
-    },
-    {
       "src": "/(.*)",
       "dest": "app.py"
     }

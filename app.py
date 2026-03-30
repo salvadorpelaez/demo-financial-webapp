@@ -111,9 +111,10 @@ def execute_with_retry(cursor, query, params=None, max_retries=5):
                 raise  # Re-raise the error if max retries reached or different error
 
 @app.route('/')
+@app.route('/portfolio')
 def index():
-    from flask import redirect, url_for
-    return redirect(url_for('portfolio_page'))
+    from flask import send_from_directory
+    return send_from_directory('static', 'portfolio.html')
 
 @app.route('/sp500')
 def sp500_page():
@@ -989,9 +990,6 @@ def get_stock_data():
 def serve_static(filename):
     return send_from_directory('static', filename)
 
-@app.route('/portfolio')
-def portfolio_page():
-    return render_template('portfolio.html')
 
 
 @app.route('/api/investable-stocks')
