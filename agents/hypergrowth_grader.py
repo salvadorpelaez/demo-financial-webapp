@@ -49,7 +49,7 @@ class HypergrowthGrader(BaseAgent):
         print(f"[HypergrowthGrader] Fetching data for {ticker}...")
         data = self.fetch_data(ticker)
 
-        user_prompt = f"""Analyze {ticker} ({company_name}) using the Hypergrowth investing framework.
+        user_prompt = f"""Analyze {ticker} ({company_name}) using the full 9-step Hypergrowth investing framework.
 
 Why this stock is classified as HYPERGROWTH: {primary_reason}
 
@@ -65,24 +65,51 @@ BALANCE SHEET:
 CASH FLOW:
 {data['cashflow']}
 
-Perform a structured analysis covering:
-1. Revenue Growth Quality (5-year trend, CAGR, acceleration or deceleration)
-2. TAM and Market Penetration (runway remaining)
-3. Gross Margin Trajectory (expanding or contracting)
-4. Rule of 40 Score (Revenue Growth % + FCF Margin %)
-5. Operating Leverage (are expenses growing slower than revenue?)
-6. Path to Profitability (cash runway, FCF trend)
-7. Competitive Moat Formation (network effects, switching costs, data advantage)
-8. Valuation — Reverse DCF (what growth rate does the current price imply?)
-9. Risk Register (top 3 risks with severity)
+CRITICAL INSTRUCTIONS:
+- You MUST include all 9 steps below in your report, in order, using the exact headings shown.
+- If data for a step is unavailable or incomplete, still include the section heading and write: "Data not available for this step — [brief explanation of what is missing and why it matters]."
+- Never skip a section. Transparency about missing data is essential.
+- Use tables wherever the data supports it.
+- Show all calculations explicitly.
+
+## STEP 1: Revenue Growth Quality
+Analyze revenue growth over the past 5 years. Calculate CAGR. Is growth accelerating or decelerating? Consistency matters — show the year-by-year trend.
+
+## STEP 2: TAM and Market Penetration
+Assess the Total Addressable Market and current penetration rate. How much runway remains? Is the company still in early innings or approaching saturation?
+
+## STEP 3: Gross Margin Trajectory
+Is the gross margin expanding or contracting over time? For hypergrowth companies, expanding margins signal improving unit economics and pricing power.
+
+## STEP 4: Rule of 40 Score
+Calculate: Revenue Growth % + FCF Margin %. A score above 40 signals a healthy balance between growth and profitability. Show the calculation explicitly.
+
+## STEP 5: Operating Leverage
+Are operating expenses growing slower than revenue? Show the ratio of revenue growth to expense growth. Improving operating leverage is a key signal of scalability.
+
+## STEP 6: Path to Profitability
+Is the company profitable? If not, what is the cash runway and FCF trend? Is the path to profitability credible based on the data? Be direct about what the numbers show.
+
+## STEP 7: Competitive Moat Formation
+Assess moat durability for a high-growth company: network effects, switching costs, data advantages, platform lock-in. Rate as Strong / Developing / Weak and explain.
+
+## STEP 8: Valuation — Reverse DCF
+What revenue growth rate is implied by the current share price? State your assumptions (discount rate, terminal growth, margin targets). Is the implied growth rate achievable or does it require perfection?
+
+## STEP 9: Risk Register
+Identify the top 3 risks with severity (High / Medium / Low) and a brief explanation of each. Include competitive risk, execution risk, and macro/regulatory risk where relevant.
+
+---
 
 End with:
-- MODEL SIGNAL: POSITIVE SIGNAL / NEUTRAL SIGNAL / NEGATIVE SIGNAL — Model Output — This is not investment advice
-- One-paragraph plain-English summary a non-specialist can understand
-- Disclaimer: This is an AI classification model for educational purposes only. It is not financial advice."""
+MODEL SIGNAL: POSITIVE SIGNAL / NEUTRAL SIGNAL / NEGATIVE SIGNAL — Model Output — This is not investment advice
+
+PLAIN-ENGLISH SUMMARY: One paragraph summarizing the key findings for a non-specialist.
+
+DISCLAIMER: This is an AI classification model for educational purposes only. It is not financial advice."""
 
         print(f"[HypergrowthGrader] Running HYPERGROWTH analysis for {ticker}...")
-        report = self.run(SYSTEM_PROMPT, user_prompt, max_tokens=4096)
+        report = self.run(SYSTEM_PROMPT, user_prompt, max_tokens=8192)
 
         recommendation = "HOLD"
         for line in report.split('\n'):
