@@ -443,7 +443,10 @@
             <div class="panel">
                 <div class="panel-title">
                     My Portfolio
-                    <span id="portfolioCount" style="font-size:0.8em;color:#666;font-weight:400"></span>
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span id="portfolioCount" style="font-size:0.8em;color:#666;font-weight:400"></span>
+                        <button onclick="clearPortfolio()" style="font-size:11px;padding:3px 10px;border:1px solid #dc3545;color:#dc3545;background:white;border-radius:12px;cursor:pointer;">Clear</button>
+                    </div>
                 </div>
                 <div class="stock-list" id="portfolioList">
                     <div class="empty-state">Add stocks from the left panel</div>
@@ -488,11 +491,21 @@
             renderStocks();
         }
 
-        // Load portfolio
-        async function loadPortfolio() {
-            const res = await fetch('/api/supabase-portfolio');
-            const data = await res.json();
-            const portfolio = data.portfolio || [];
+        // Portfolio stored in sessionStorage — clears automatically when tab closes
+        const SESSION_KEY = 'fa_portfolio';
+
+        function getSessionPortfolio() {
+            try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || '[]'); }
+            catch { return []; }
+        }
+
+        function saveSessionPortfolio(portfolio) {
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify(portfolio));
+        }
+
+        function loadPortfolio() {
+            const portfolio = getSessionPortfolio();
+            portfolioMap = {};
             portfolio.forEach(s => portfolioMap[s.ticker] = s);
             renderPortfolio(portfolio);
         }
@@ -586,27 +599,34 @@
         }
         }
 
-        async function addToPortfolio(ticker) {
+        function addToPortfolio(ticker) {
             const stock = stockMap[ticker];
             if (!stock) return;
-            const res = await fetch('/api/supabase-portfolio/add', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify(stock)
-            });
-            const data = await res.json();
-            showToast(data.message || `${ticker} added!`);
+            const portfolio = getSessionPortfolio();
+            if (portfolio.find(s => s.ticker === ticker)) {
+                showToast(`${ticker} already in portfolio`);
+                return;
+            }
+            portfolio.push(stock);
+            saveSessionPortfolio(portfolio);
+            showToast(`${ticker} added!`);
             loadPortfolio();
         }
 
-        async function removeFromPortfolio(ticker) {
-            await fetch('/api/supabase-portfolio/remove', {
-                method: 'DELETE',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ticker})
-            });
+        function removeFromPortfolio(ticker) {
+            const portfolio = getSessionPortfolio().filter(s => s.ticker !== ticker);
+            saveSessionPortfolio(portfolio);
             showToast(`${ticker} removed`);
             loadPortfolio();
+        }
+
+        function clearPortfolio() {
+            if (!confirm('Clear all stocks from your portfolio?')) return;
+            sessionStorage.removeItem(SESSION_KEY);
+            portfolioMap = {};
+            loadPortfolio();
+            showToast('Portfolio cleared');
+        }
         }
 
         // Show consent modal before every analysis
