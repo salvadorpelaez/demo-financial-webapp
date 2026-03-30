@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Financial Analytics — Portfolio & AI Signal Classification</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .disclaimer {
+            background: #1a1a2e;
+            border-left: 5px solid #e74c3c;
+            padding: 14px 20px;
+            border-radius: 8px;
+            margin-bottom: 16px;
+        }
+        .disclaimer-title {
+            font-size: 0.95em;
+            font-weight: 800;
+            color: #ffffff;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+        .disclaimer-body {
+            font-size: 0.82em;
+            color: #ccc;
+            line-height: 1.5;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 20px 30px;
+            border-radius: 12px 12px 0 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        header h1 { font-size: 1.5em; }
+        header p { font-size: 0.9em; opacity: 0.8; margin-top: 4px; }
+        .back-btn {
+            background: rgba(255,255,255,0.15);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            text-decoration: none;
+        }
+        .layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0;
+            background: white;
+            border-radius: 0 0 12px 12px;
+            overflow: hidden;
+        }
+        .panel {
+            padding: 24px;
+            border-right: 1px solid #eee;
+        }
+        .panel:last-child { border-right: none; }
+
+        /* ── Mobile: horizontal swipe between panels ── */
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+
+            header { padding: 14px 16px; }
+            header h1 { font-size: 1.1em; }
+            header p { font-size: 0.8em; }
+
+            .layout {
+                display: flex;
+                overflow-x: auto;
+                overflow-y: hidden;
+                scroll-snap-type: x mandatory;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: thin;
+                scrollbar-color: #667eea #eee;
+                border-radius: 0 0 12px 12px;
+            }
+
+            .layout::-webkit-scrollbar { height: 6px; }
+            .layout::-webkit-scrollbar-track { background: #eee; }
+            .layout::-webkit-scrollbar-thumb { background: #667eea; border-radius: 3px; }
+
+            .panel {
+                min-width: 100%;
+                width: 100%;
+                scroll-snap-align: start;
+                overflow-y: auto;
+                overflow-x: hidden;
+                max-height: 72vh;
+                border-right: none;
+                border-bottom: 1px solid #eee;
+                padding: 16px;
+                scrollbar-width: thin;
+                scrollbar-color: #667eea #eee;
+            }
+
+            .panel::-webkit-scrollbar { width: 4px; }
+            .panel::-webkit-scrollbar-thumb { background: #667eea; border-radius: 3px; }
+
+            /* Remove fixed heights so content scrolls naturally */
+            .stock-list { max-height: none; overflow-y: visible; }
+            .report-text { max-height: none; overflow-y: visible; }
+
+            /* Swipe hint label */
+            .swipe-hint {
+                display: block;
+                text-align: center;
+                font-size: 12px;
+                font-weight: 600;
+                color: #fff;
+                padding: 8px;
+                background: rgba(0,0,0,0.3);
+                border-radius: 6px;
+                margin-bottom: 8px;
+                letter-spacing: 0.03em;
+            }
+        }
+
+        @media (min-width: 769px) {
+            .swipe-hint { display: none; }
+        }
+
+        /* Landscape on small screens: keep grid but ensure scrollbars available */
+        @media (max-width: 900px) and (orientation: landscape) {
+            .layout {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                overflow-x: auto;
+                overflow-y: auto;
+            }
+            .panel {
+                overflow-y: auto;
+                max-height: 80vh;
+                scrollbar-width: thin;
+                scrollbar-color: #667eea #eee;
+            }
+            .stock-list { max-height: none; }
+            .report-text { max-height: none; }
+        }
+        .panel-title {
+            font-size: 1em;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .badge {
+            font-size: 0.75em;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-weight: 600;
+        }
+        .badge-value { background: #d4edda; color: #155724; }
+        .badge-hypergrowth { background: #cce5ff; color: #004085; }
+        .filter-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .filter-btn {
+            padding: 6px 14px;
+            border: 1px solid #dee2e6;
+            border-radius: 20px;
+            background: white;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .filter-btn.active { background: #2c3e50; color: white; border-color: #2c3e50; }
+        .search-input {
+            width: 100%;
+            padding: 8px 12px;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 12px;
+        }
+        .stock-list { max-height: 500px; overflow-y: auto; }
+        .stock-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.15s;
+        }
+        .stock-item:hover { background: #f8f9fa; }
+        .stock-info { flex: 1; }
+        .stock-ticker { font-weight: 700; font-size: 14px; color: #2c3e50; }
+        .stock-name { font-size: 12px; color: #666; margin-top: 2px; }
+        .stock-sector { font-size: 11px; color: #999; }
+        .stock-reason { font-size: 11px; color: #888; font-style: italic; margin-top: 2px; }
+        .add-btn {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: background 0.2s;
+        }
+        .add-btn:hover { background: #218838; }
+        .add-btn:disabled { background: #ccc; cursor: not-allowed; }
+        .portfolio-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 12px;
+            border-bottom: 1px solid #f0f0f0;
+            gap: 8px;
+        }
+        .stock-price { font-size: 13px; font-weight: 600; color: #2c3e50; text-align: right; min-width: 70px; }
+        .stock-change { font-size: 11px; }
+        .positive { color: #28a745; }
+        .negative { color: #dc3545; }
+        .analyze-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: background 0.2s;
+            white-space: nowrap;
+        }
+        .analyze-btn:hover { background: #5a6fd6; }
+        .remove-btn {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .remove-btn:hover { background: #c82333; }
+        .valuation-panel {
+            background: white;
+            border-radius: 12px;
+            margin-top: 16px;
+            overflow: hidden;
+        }
+        .valuation-header {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: white;
+            padding: 16px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .valuation-body { padding: 24px; }
+        .signal-badge {
+            display: inline-block;
+            padding: 6px 18px;
+            border-radius: 20px;
+            font-weight: 700;
+            font-size: 0.9em;
+            margin-bottom: 4px;
+        }
+        .signal-positive { background: #d4edda; color: #155724; }
+        .signal-neutral  { background: #fff3cd; color: #856404; }
+        .signal-negative { background: #f8d7da; color: #721c24; }
+        .signal-disclaimer {
+            font-size: 0.75em;
+            color: #999;
+            margin-bottom: 16px;
+        }
+        .report-text {
+            white-space: pre-wrap;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #333;
+            max-height: 600px;
+            overflow-y: auto;
+            background: #f8f9fa;
+            padding: 16px;
+            border-radius: 8px;
+        }
+        .report-watermark {
+            margin-top: 16px;
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 6px;
+            padding: 10px 16px;
+            font-size: 0.8em;
+            color: #856404;
+            font-weight: 600;
+            text-align: center;
+        }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .empty-state { text-align: center; padding: 40px; color: #999; }
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            background: #2c3e50;
+            color: white;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 1000;
+        }
+        .toast.show { opacity: 1; }
+
+        /* Consent Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+        .modal-overlay.show { display: flex; }
+        .modal {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            max-width: 480px;
+            width: 90%;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        .modal-icon {
+            font-size: 2em;
+            margin-bottom: 12px;
+        }
+        .modal h2 {
+            font-size: 1.15em;
+            font-weight: 800;
+            color: #1a1a2e;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .modal p {
+            font-size: 0.9em;
+            color: #444;
+            line-height: 1.6;
+            margin-bottom: 10px;
+        }
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        .modal-confirm {
+            flex: 1;
+            background: #2c3e50;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .modal-confirm:hover { background: #1a252f; }
+        .modal-cancel {
+            flex: 1;
+            background: #f0f0f0;
+            color: #666;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <!-- Consent Modal -->
+    <div class="modal-overlay" id="consentModal">
+        <div class="modal">
+            <div class="modal-icon">⚠️</div>
+            <h2>Important Disclaimer</h2>
+            <p><strong>This tool is an AI classification model for educational and demonstration purposes only.</strong></p>
+            <p>It processes historical financial data to generate directional signals. The output — including any POSITIVE, NEGATIVE, or NEUTRAL signals — is a <strong>model prediction, not financial advice</strong>.</p>
+            <p>Do not make any investment or financial decisions based on this output. Past data patterns do not guarantee future results.</p>
+            <div class="modal-actions">
+                <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+                <button class="modal-confirm" onclick="confirmAndAnalyze()">I Understand — Generate Signal</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="disclaimer">
+            <div class="disclaimer-title">⚡ AI Classification Model — Educational Demo</div>
+            <div class="disclaimer-body">
+                This application uses an AI model to classify historical stock data into directional signals (POSITIVE / NEUTRAL / NEGATIVE).
+                It is a demonstration of machine learning applied to public market data.
+                <strong style="color:#fff"> This is not financial advice. Do not make investment decisions based on this tool.</strong>
+            </div>
+        </div>
+
+        <header>
+            <div>
+                <h1>Financial Analytics — Portfolio & AI Signal Classification</h1>
+                <p>Select VALUE or HYPERGROWTH stocks · Add to portfolio · Run AI classification model</p>
+            </div>
+        </header>
+
+        <span class="swipe-hint">← Swipe to review portfolio →</span>
+        <div class="layout">
+            <!-- Left: Stock Browser -->
+            <div class="panel">
+                <div class="panel-title">
+                    Investable Stocks
+                    <span id="stockCount" style="font-size:0.8em;color:#666;font-weight:400"></span>
+                </div>
+                <div class="filter-row">
+                    <button class="filter-btn active" onclick="filterStocks('ALL')">All</button>
+                    <button class="filter-btn" onclick="filterStocks('VALUE')">VALUE</button>
+                    <button class="filter-btn" onclick="filterStocks('HYPERGROWTH')">HYPERGROWTH</button>
+                </div>
+                <input type="text" class="search-input" placeholder="Search ticker or name..." oninput="searchStocks(this.value)">
+                <div class="stock-list" id="stockList">
+                    <div class="loading">Loading stocks...</div>
+                </div>
+            </div>
+
+            <!-- Right: Portfolio -->
+            <div class="panel">
+                <div class="panel-title">
+                    My Portfolio
+                    <div style="display:flex;align-items:center;gap:10px">
+                        <span id="portfolioCount" style="font-size:0.8em;color:#666;font-weight:400"></span>
+                        <button onclick="clearPortfolio()" style="font-size:11px;padding:3px 10px;border:1px solid #dc3545;color:#dc3545;background:white;border-radius:12px;cursor:pointer;">Clear</button>
+                    </div>
+                </div>
+                <div class="stock-list" id="portfolioList">
+                    <div class="empty-state">Add stocks from the left panel</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Valuation Report -->
+        <div class="valuation-panel" id="valuationPanel" style="display:none">
+            <div class="valuation-header">
+                <div>
+                    <strong id="valuationTicker"></strong> — AI Model Output
+                    <div style="font-size:0.85em;opacity:0.8;margin-top:4px" id="valuationClassification"></div>
+                </div>
+            </div>
+            <div class="valuation-body">
+                <div id="signalBadge" class="signal-badge"></div>
+                <div class="signal-disclaimer">Model Output — This is not investment advice</div>
+                <div class="report-watermark">⚠️ MODEL OUTPUT ONLY — NOT FINANCIAL ADVICE — FOR EDUCATIONAL AND DEMONSTRATION PURPOSES</div>
+                <div id="valuationContent" class="report-text"></div>
+                <div class="report-watermark">⚠️ MODEL OUTPUT ONLY — NOT FINANCIAL ADVICE — FOR EDUCATIONAL AND DEMONSTRATION PURPOSES</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+        let allStocks = [];
+        let stockMap = {};
+        let portfolioMap = {};
+        let currentFilter = 'ALL';
+        let currentSearch = '';
+        let pendingAnalysisTicker = null;
+
+        // Load stocks from static JSON file — served instantly by Vercel, no cold start
+        async function loadStocks() {
+            const res = await fetch('/static/stocks.json');
+            const data = await res.json();
+            allStocks = data.stocks || [];
+            allStocks.forEach(s => stockMap[s.ticker] = s);
+            renderStocks();
+        }
+
+        // Portfolio stored in sessionStorage — clears automatically when tab closes
+        const SESSION_KEY = 'fa_portfolio';
+
+        function getSessionPortfolio() {
+            try { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || '[]'); }
+            catch { return []; }
+        }
+
+        function saveSessionPortfolio(portfolio) {
+            sessionStorage.setItem(SESSION_KEY, JSON.stringify(portfolio));
+        }
+
+        function loadPortfolio() {
+            const portfolio = getSessionPortfolio();
+            portfolioMap = {};
+            portfolio.forEach(s => portfolioMap[s.ticker] = s);
+            renderPortfolio(portfolio);
+        }
+
+        function filterStocks(type) {
+            currentFilter = type;
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+            renderStocks();
+        }
+
+        function searchStocks(query) {
+            currentSearch = query.toLowerCase();
+            renderStocks();
+        }
+
+        function renderStocks() {
+            let filtered = allStocks;
+            if (currentFilter !== 'ALL') {
+                filtered = filtered.filter(s => s.classification === currentFilter);
+            }
+            if (currentSearch) {
+                filtered = filtered.filter(s =>
+                    s.ticker.toLowerCase().includes(currentSearch) ||
+                    s.name.toLowerCase().includes(currentSearch)
+                );
+            }
+
+            document.getElementById('stockCount').textContent = `${filtered.length} stocks`;
+
+            if (filtered.length === 0) {
+                document.getElementById('stockList').innerHTML = '<div class="empty-state">No stocks found</div>';
+                return;
+            }
+
+            document.getElementById('stockList').innerHTML = filtered.map(s => `
+                <div class="stock-item">
+                    <div class="stock-info">
+                        <div>
+                            <span class="stock-ticker">${s.ticker}</span>
+                            <span class="badge badge-${s.classification.toLowerCase()}" style="margin-left:8px">${s.classification}</span>
+                        </div>
+                        <div class="stock-name">${s.name}</div>
+                        <div class="stock-sector">${s.sector}</div>
+                        <div class="stock-reason">${s.primary_reason || ''}</div>
+                    </div>
+                    <button class="add-btn" onclick="addToPortfolio('${s.ticker}')">+ Add</button>
+                </div>
+            `).join('');
+        }
+
+        function renderPortfolio(portfolio) {
+            document.getElementById('portfolioCount').textContent = `${portfolio.length} stocks`;
+            if (portfolio.length === 0) {
+                document.getElementById('portfolioList').innerHTML = '<div class="empty-state">Add stocks from the left panel</div>';
+                return;
+            }
+            document.getElementById('portfolioList').innerHTML = portfolio.map(s => `
+                <div class="portfolio-item" id="item-${s.ticker}">
+                    <div class="stock-info">
+                        <div>
+                            <span class="stock-ticker">${s.ticker}</span>
+                            <span class="badge badge-${(s.classification||'').toLowerCase()}" style="margin-left:8px">${s.classification||''}</span>
+                        </div>
+                        <div class="stock-name">${s.name}</div>
+                    </div>
+                    <div class="stock-price" id="price-${s.ticker}">...</div>
+                    <button class="analyze-btn" onclick="requestAnalysis('${s.ticker}')">Generate AI Signal</button>
+                    <button class="remove-btn" onclick="removeFromPortfolio('${s.ticker}')">✕</button>
+                </div>
+            `).join('');
+
+        // Fetch live prices
+        if (portfolio.length > 0) {
+            const tickers = portfolio.map(s => s.ticker).join(',');
+            fetch(`/api/stock-prices?tickers=${tickers}`)
+                .then(r => r.json())
+                .then(prices => {
+                    Object.entries(prices).forEach(([ticker, data]) => {
+                        const el = document.getElementById(`price-${ticker}`);
+                        if (!el) return;
+                        if (data.price === 'N/A') {
+                            el.textContent = 'N/A';
+                        } else {
+                            const changeClass = data.change >= 0 ? 'positive' : 'negative';
+                            const sign = data.change >= 0 ? '+' : '';
+                            el.innerHTML = `$${data.price}<br><span class="stock-change ${changeClass}">${sign}${data.change_percent.toFixed(2)}%</span>`;
+                        }
+                    });
+                });
+        }
+        }
+
+        function addToPortfolio(ticker) {
+            const stock = stockMap[ticker];
+            if (!stock) return;
+            const portfolio = getSessionPortfolio();
+            if (portfolio.find(s => s.ticker === ticker)) {
+                showToast(`${ticker} already in portfolio`);
+                return;
+            }
+            portfolio.push(stock);
+            saveSessionPortfolio(portfolio);
+            showToast(`${ticker} added!`);
+            loadPortfolio();
+        }
+
+        function removeFromPortfolio(ticker) {
+            const portfolio = getSessionPortfolio().filter(s => s.ticker !== ticker);
+            saveSessionPortfolio(portfolio);
+            showToast(`${ticker} removed`);
+            loadPortfolio();
+        }
+
+        function clearPortfolio() {
+            if (!confirm('Clear all stocks from your portfolio?')) return;
+            sessionStorage.removeItem(SESSION_KEY);
+            portfolioMap = {};
+            loadPortfolio();
+            showToast('Portfolio cleared');
+        }
+        }
+
+        // Show consent modal before every analysis
+        function requestAnalysis(ticker) {
+            pendingAnalysisTicker = ticker;
+            document.getElementById('consentModal').classList.add('show');
+        }
+
+        function closeModal() {
+            pendingAnalysisTicker = null;
+            document.getElementById('consentModal').classList.remove('show');
+        }
+
+        function confirmAndAnalyze() {
+            document.getElementById('consentModal').classList.remove('show');
+            if (pendingAnalysisTicker) {
+                analyzeStock(pendingAnalysisTicker);
+                pendingAnalysisTicker = null;
+            }
+        }
+
+        async function analyzeStock(ticker) {
+            const stock = portfolioMap[ticker] || stockMap[ticker] || {ticker};
+            showToast(`Starting AI classification for ${ticker}... (~30 seconds)`);
+
+            // Check for cached result
+            const existing = await fetch(`/api/valuation/${ticker}`);
+            const existingData = await existing.json();
+            if (existingData.valuation) {
+                displayValuation(ticker, existingData.valuation);
+                showToast('Loaded cached model output');
+                return;
+            }
+
+            // Trigger new analysis
+            document.getElementById('valuationPanel').style.display = 'block';
+            document.getElementById('valuationTicker').textContent = ticker;
+            document.getElementById('valuationContent').textContent = 'AI model running classification... this takes ~30 seconds.';
+            document.getElementById('signalBadge').textContent = '';
+            document.getElementById('signalBadge').className = 'signal-badge';
+
+            await fetch(`/api/analyze/${ticker}`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(stock)
+            });
+
+            pollForValuation(ticker, 0);
+        }
+
+        async function pollForValuation(ticker, attempts) {
+            if (attempts > 20) {
+                document.getElementById('valuationContent').textContent = 'Classification is taking longer than expected. Try clicking Generate AI Signal again.';
+                return;
+            }
+            const res = await fetch(`/api/valuation/${ticker}`);
+            const data = await res.json();
+            if (data.valuation) {
+                displayValuation(ticker, data.valuation);
+            } else {
+                setTimeout(() => pollForValuation(ticker, attempts + 1), 5000);
+            }
+        }
+
+        function mapSignal(recommendation) {
+            const r = (recommendation || 'HOLD').toUpperCase();
+            if (r === 'BUY')  return { label: 'POSITIVE SIGNAL', cssClass: 'signal-positive' };
+            if (r === 'SELL') return { label: 'NEGATIVE SIGNAL', cssClass: 'signal-negative' };
+            return { label: 'NEUTRAL SIGNAL', cssClass: 'signal-neutral' };
+        }
+
+        function displayValuation(ticker, v) {
+            document.getElementById('valuationPanel').style.display = 'block';
+            document.getElementById('valuationTicker').textContent = ticker;
+            document.getElementById('valuationClassification').textContent = v.classification + ' Framework — Classification Result';
+            const signal = mapSignal(v.recommendation);
+            const badgeEl = document.getElementById('signalBadge');
+            badgeEl.textContent = signal.label;
+            badgeEl.className = `signal-badge ${signal.cssClass}`;
+            document.getElementById('valuationContent').textContent = v.report;
+        }
+
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            t.textContent = msg;
+            t.classList.add('show');
+            setTimeout(() => t.classList.remove('show'), 3000);
+        }
+
+        // Init
+        loadStocks();
+        loadPortfolio();
+    </script>
+</body>
+</html>
