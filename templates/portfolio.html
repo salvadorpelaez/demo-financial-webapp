@@ -67,6 +67,84 @@
             border-right: 1px solid #eee;
         }
         .panel:last-child { border-right: none; }
+
+        /* ── Mobile: horizontal swipe between panels ── */
+        @media (max-width: 768px) {
+            body { padding: 10px; }
+
+            header { padding: 14px 16px; }
+            header h1 { font-size: 1.1em; }
+            header p { font-size: 0.8em; }
+
+            .layout {
+                display: flex;
+                overflow-x: auto;
+                overflow-y: hidden;
+                scroll-snap-type: x mandatory;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: thin;
+                scrollbar-color: #667eea #eee;
+                border-radius: 0 0 12px 12px;
+            }
+
+            .layout::-webkit-scrollbar { height: 6px; }
+            .layout::-webkit-scrollbar-track { background: #eee; }
+            .layout::-webkit-scrollbar-thumb { background: #667eea; border-radius: 3px; }
+
+            .panel {
+                min-width: 100%;
+                width: 100%;
+                scroll-snap-align: start;
+                overflow-y: auto;
+                overflow-x: hidden;
+                max-height: 72vh;
+                border-right: none;
+                border-bottom: 1px solid #eee;
+                padding: 16px;
+                scrollbar-width: thin;
+                scrollbar-color: #667eea #eee;
+            }
+
+            .panel::-webkit-scrollbar { width: 4px; }
+            .panel::-webkit-scrollbar-thumb { background: #667eea; border-radius: 3px; }
+
+            /* Remove fixed heights so content scrolls naturally */
+            .stock-list { max-height: none; overflow-y: visible; }
+            .report-text { max-height: none; overflow-y: visible; }
+
+            /* Swipe hint label */
+            .swipe-hint {
+                display: block;
+                text-align: center;
+                font-size: 11px;
+                color: #999;
+                padding: 6px;
+                background: white;
+                border-radius: 0 0 12px 12px;
+            }
+        }
+
+        @media (min-width: 769px) {
+            .swipe-hint { display: none; }
+        }
+
+        /* Landscape on small screens: keep grid but ensure scrollbars available */
+        @media (max-width: 900px) and (orientation: landscape) {
+            .layout {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                overflow-x: auto;
+                overflow-y: auto;
+            }
+            .panel {
+                overflow-y: auto;
+                max-height: 80vh;
+                scrollbar-width: thin;
+                scrollbar-color: #667eea #eee;
+            }
+            .stock-list { max-height: none; }
+            .report-text { max-height: none; }
+        }
         .panel-title {
             font-size: 1em;
             font-weight: 700;
@@ -368,6 +446,7 @@
                 </div>
             </div>
         </div>
+        <span class="swipe-hint">← swipe to see portfolio →</span>
 
         <!-- Valuation Report -->
         <div class="valuation-panel" id="valuationPanel" style="display:none">
