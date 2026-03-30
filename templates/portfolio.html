@@ -482,12 +482,26 @@
         let currentSearch = '';
         let pendingAnalysisTicker = null;
 
-        // Load stocks
+        // Load stocks — cached in localStorage for 24 hours to avoid slow reload every visit
+        const STOCKS_CACHE_KEY = 'fa_stocks_cache';
+        const STOCKS_CACHE_TTL = 24 * 60 * 60 * 1000; // 24 hours in ms
+
         async function loadStocks() {
+            try {
+                const cached = JSON.parse(localStorage.getItem(STOCKS_CACHE_KEY) || 'null');
+                if (cached && (Date.now() - cached.timestamp < STOCKS_CACHE_TTL)) {
+                    allStocks = cached.stocks;
+                    allStocks.forEach(s => stockMap[s.ticker] = s);
+                    renderStocks();
+                    return;
+                }
+            } catch {}
+
             const res = await fetch('/api/investable-stocks');
             const data = await res.json();
             allStocks = data.stocks || [];
             allStocks.forEach(s => stockMap[s.ticker] = s);
+            localStorage.setItem(STOCKS_CACHE_KEY, JSON.stringify({ stocks: allStocks, timestamp: Date.now() }));
             renderStocks();
         }
 
