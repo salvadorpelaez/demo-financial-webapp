@@ -45,7 +45,7 @@ class StockGrader(BaseAgent):
         print(f"[StockGrader] Fetching data for {ticker}...")
         data = self.fetch_data(ticker)
 
-        user_prompt = f"""Analyze {ticker} ({company_name}) using the Warren Buffett value investing framework.
+        user_prompt = f"""Analyze {ticker} ({company_name}) using the full 13-step Warren Buffett value investing framework.
 
 Why this stock is classified as VALUE: {primary_reason}
 
@@ -61,22 +61,64 @@ BALANCE SHEET:
 CASH FLOW:
 {data['cashflow']}
 
-Perform a structured analysis covering:
-1. Intrinsic Value (Buffett formula: IV = EPS × (8.5 + 2g) × (4.4/Y) and Two-Stage DCF)
-2. Retained Earnings Analysis (10-year MC/RE ratio)
-3. Free Cash Flow and Profit Margins
-4. Competitive Moat Assessment
-5. Debt Analysis
-6. Return on Equity (10-year trend)
-7. Management Quality
+CRITICAL INSTRUCTIONS:
+- You MUST include all 13 steps below in your report, in order, using the exact headings shown.
+- If data for a step is unavailable or incomplete, still include the section heading and write: "Data not available for this step — [brief explanation of what is missing and why it matters]."
+- Never skip a section. Transparency about missing data is essential.
+- Use tables wherever the data supports it.
+- Show all calculations explicitly.
+
+## STEP 1: Earnings Per Share (EPS) — 10-Year Trend
+Analyze EPS over the past 10 years. Is it growing consistently? Show the trend.
+
+## STEP 2: Return on Equity (ROE) — 10-Year Trend
+Calculate ROE for each available year. Buffett looks for >15% sustained ROE.
+
+## STEP 3: Return on Invested Capital (ROIC)
+Calculate ROIC. Is the company generating returns well above its cost of capital?
+
+## STEP 4: Debt-to-Equity Ratio
+Assess the debt load. Buffett prefers companies that can pay off long-term debt within 3–4 years from earnings.
+
+## STEP 5: Free Cash Flow (FCF)
+Is the company generating consistent free cash flow? Show FCF trend and FCF margin.
+
+## STEP 6: Profit Margins — Gross, Operating, Net
+Analyze all three margin types. Are they stable or expanding? Buffett favors companies with durable, wide margins.
+
+## STEP 7: Retained Earnings
+Is the company retaining earnings and deploying them effectively? Analyze the 10-year retained earnings trend and the market cap / retained earnings ratio.
+
+## STEP 8: Intrinsic Value — Ben Graham Formula
+Calculate: IV = EPS × (8.5 + 2g) × (4.4 / Y)
+Where g = estimated growth rate, Y = current 10-year Treasury yield (~4.5%). Compare to current price.
+
+## STEP 9: Intrinsic Value — Discounted Cash Flow (DCF)
+Perform a two-stage DCF. State your assumptions clearly (growth rate, discount rate, terminal value). Compare to current price and calculate margin of safety.
+
+## STEP 10: Margin of Safety
+What is the margin of safety based on Steps 8 and 9? Buffett requires at least 25–30% below intrinsic value.
+
+## STEP 11: Competitive Moat
+Assess the economic moat: brand, patents, switching costs, network effects, cost advantage. Rate as Wide / Narrow / None and explain.
+
+## STEP 12: Management Quality
+Assess capital allocation, share buybacks, dividends, insider ownership, and any notable management decisions visible in the data.
+
+## STEP 13: Price-to-Book Value (P/B)
+Calculate P/B ratio. How does it compare to historical averages and sector peers?
+
+---
 
 End with:
-- MODEL SIGNAL: POSITIVE SIGNAL / NEUTRAL SIGNAL / NEGATIVE SIGNAL — Model Output — This is not investment advice
-- One-paragraph plain-English summary a non-specialist can understand
-- Disclaimer: This is an AI classification model for educational purposes only. It is not financial advice."""
+MODEL SIGNAL: POSITIVE SIGNAL / NEUTRAL SIGNAL / NEGATIVE SIGNAL — Model Output — This is not investment advice
+
+PLAIN-ENGLISH SUMMARY: One paragraph summarizing the key findings for a non-specialist.
+
+DISCLAIMER: This is an AI classification model for educational purposes only. It is not financial advice."""
 
         print(f"[StockGrader] Running VALUE analysis for {ticker}...")
-        report = self.run(SYSTEM_PROMPT, user_prompt, max_tokens=4096)
+        report = self.run(SYSTEM_PROMPT, user_prompt, max_tokens=8192)
 
         recommendation = "HOLD"
         for line in report.split('\n'):
