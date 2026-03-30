@@ -7,12 +7,28 @@ import os
 import threading
 from datetime import datetime
 import time
+from collections import defaultdict
 from technical_indicators import indicators_bp
 from supabase import create_client
 from agents.router import run_valuation
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Simple in-memory rate limiter: 10 analyze calls per IP per hour
+_rate_limit_store = defaultdict(list)
+RATE_LIMIT = 10
+RATE_WINDOW = 3600  # seconds
+
+def is_rate_limited(ip):
+    now = time.time()
+    calls = _rate_limit_store[ip]
+    # Remove calls older than 1 hour
+    _rate_limit_store[ip] = [t for t in calls if now - t < RATE_WINDOW]
+    if len(_rate_limit_store[ip]) >= RATE_LIMIT:
+        return True
+    _rate_limit_store[ip].append(now)
+    return False
 
 # Supabase client
 _supabase_url = os.getenv("SUPABASE_URL")
@@ -1058,7 +1074,11 @@ def remove_from_supabase_portfolio():
 
 @app.route('/api/analyze/<ticker>', methods=['POST'])
 def analyze_stock(ticker):
-    """Trigger valuation analysis for a stock — runs in background thread"""
+    """Trigger valuation analysis for a stock"""
+    ip = request.headers.get('X-Forwarded-For', request.remote_addr).split(',')[0].strip()
+    if is_rate_limited(ip):
+        return jsonify({'error': 'Rate limit reached. Maximum 10 analyses per hour per user.'}), 429
+
     if not supabase_client:
         return jsonify({'error': 'Supabase not configured'}), 500
 
