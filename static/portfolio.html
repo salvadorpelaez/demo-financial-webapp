@@ -484,11 +484,17 @@
 
         // Load stocks from database
         async function loadStocks() {
-            const res = await fetch('/api/investable-stocks');
-            const data = await res.json();
-            allStocks = data.stocks || [];
-            allStocks.forEach(s => stockMap[s.ticker] = s);
-            renderStocks();
+            try {
+                const res = await fetch('/api/investable-stocks');
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                allStocks = data.stocks || [];
+                allStocks.forEach(s => stockMap[s.ticker] = s);
+                renderStocks();
+            } catch (err) {
+                document.getElementById('stockList').innerHTML =
+                    `<div class="loading" style="color:#e57373;">Failed to load stocks. Please refresh the page.<br><small>${err.message}</small></div>`;
+            }
         }
 
         // Portfolio stored in sessionStorage — clears automatically when tab closes
