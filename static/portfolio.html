@@ -442,7 +442,7 @@
             <!-- Right: Portfolio -->
             <div class="panel">
                 <div class="panel-title">
-                    My Portfolio
+                    My List
                     <div style="display:flex;align-items:center;gap:10px">
                         <span id="portfolioCount" style="font-size:0.8em;color:#666;font-weight:400"></span>
                         <button onclick="clearPortfolio()" style="font-size:11px;padding:3px 10px;border:1px solid #dc3545;color:#dc3545;background:white;border-radius:12px;cursor:pointer;">Clear</button>
@@ -621,7 +621,7 @@
         }
 
         function clearPortfolio() {
-            if (!confirm('Clear all stocks from your portfolio?')) return;
+            if (!confirm('Clear all stocks from your list?')) return;
             sessionStorage.removeItem(SESSION_KEY);
             portfolioMap = {};
             loadPortfolio();
