@@ -482,9 +482,9 @@
         let currentSearch = '';
         let pendingAnalysisTicker = null;
 
-        // Load stocks from static JSON file — served instantly by Vercel, no cold start
+        // Load stocks from database
         async function loadStocks() {
-            const res = await fetch('/static/stocks.json');
+            const res = await fetch('/api/investable-stocks');
             const data = await res.json();
             allStocks = data.stocks || [];
             allStocks.forEach(s => stockMap[s.ticker] = s);
