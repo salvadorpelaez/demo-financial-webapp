@@ -604,7 +604,7 @@
             if (!stock) return;
             const portfolio = getSessionPortfolio();
             if (portfolio.find(s => s.ticker === ticker)) {
-                showToast(`${ticker} already in portfolio`);
+                showToast(`${ticker} already in your list`);
                 return;
             }
             portfolio.push(stock);
@@ -625,7 +625,7 @@
             sessionStorage.removeItem(SESSION_KEY);
             portfolioMap = {};
             loadPortfolio();
-            showToast('Portfolio cleared');
+            showToast('List cleared');
         }
 
         // Show consent modal before every analysis
