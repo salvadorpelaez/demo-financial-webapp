@@ -1,16 +1,13 @@
 from flask import Flask, render_template, request, jsonify, send_from_directory
 import sqlite3
-import yfinance as yf
-import pandas as pd
 import requests
 import os
-import threading
 from datetime import datetime
 import time
 from collections import defaultdict
 from technical_indicators import indicators_bp
 from supabase import create_client
-from agents.router import run_valuation
+# run_valuation imported lazily in analyze_stock to reduce cold start time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -150,6 +147,8 @@ def get_market_data():
         ]
         
         # Get all indices using yfinance (supports European markets)
+        import yfinance as yf
+        import pandas as pd
         all_tickers = [symbol for name, symbol in ordered_indices]
         data = yf.download(all_tickers, period='2d', interval='1d')
         
@@ -646,6 +645,7 @@ def get_stock_prices():
     if not tickers:
         return jsonify({'error': 'No tickers provided'}), 400
 
+    import yfinance as yf
     prices = {}
     for ticker in tickers:
         try:
@@ -1086,6 +1086,7 @@ def analyze_stock(ticker):
     primary_reason = data.get('primary_reason', '')
 
     try:
+        from agents.router import run_valuation
         result = run_valuation(ticker, company_name, classification, primary_reason)
         supabase_client.table('valuations').upsert({
             'ticker': ticker,
