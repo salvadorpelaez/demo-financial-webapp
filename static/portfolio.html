@@ -485,9 +485,9 @@
         // Load stocks from database
         async function loadStocks() {
             try {
-                const res = await fetch('/api/investable-stocks');
+                const res = await fetch('/static/stocks.json');
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
                 const data = await res.json();
-                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 allStocks = data.stocks || [];
                 allStocks.forEach(s => stockMap[s.ticker] = s);
                 renderStocks();
