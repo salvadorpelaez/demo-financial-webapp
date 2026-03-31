@@ -6,8 +6,7 @@ from datetime import datetime
 import time
 from collections import defaultdict
 from technical_indicators import indicators_bp
-from supabase import create_client
-# run_valuation imported lazily in analyze_stock to reduce cold start time
+# supabase and run_valuation imported lazily to reduce cold start time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -27,10 +26,17 @@ def is_rate_limited(ip):
     _rate_limit_store[ip].append(now)
     return False
 
-# Supabase client
-_supabase_url = os.getenv("SUPABASE_URL")
-_supabase_key = os.getenv("SUPABASE_KEY")
-supabase_client = create_client(_supabase_url, _supabase_key) if _supabase_url and _supabase_key else None
+# Lazy Supabase client — only initialized on first use
+_supabase_instance = None
+
+def get_supabase():
+    global _supabase_instance
+    if _supabase_instance is None:
+        from supabase import create_client
+        url = os.getenv("SUPABASE_URL")
+        key = os.getenv("SUPABASE_KEY")
+        _supabase_instance = create_client(url, key) if url and key else False
+    return _supabase_instance or None
 
 app = Flask(__name__)
 
@@ -1022,10 +1028,10 @@ def get_investable_stocks():
 
 @app.route('/api/supabase-portfolio', methods=['GET'])
 def get_supabase_portfolio():
-    if not supabase_client:
+    if not get_supabase():
         return jsonify({'error': 'Supabase not configured'}), 500
     try:
-        result = supabase_client.table('portfolio').select('*').order('created_at', desc=True).execute()
+        result = get_supabase().table('portfolio').select('*').order('created_at', desc=True).execute()
         return jsonify({'portfolio': result.data})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1033,17 +1039,17 @@ def get_supabase_portfolio():
 
 @app.route('/api/supabase-portfolio/add', methods=['POST'])
 def add_to_supabase_portfolio():
-    if not supabase_client:
+    if not get_supabase():
         return jsonify({'error': 'Supabase not configured'}), 500
     data = request.get_json()
     ticker = data.get('ticker')
     if not ticker:
         return jsonify({'error': 'Ticker required'}), 400
     try:
-        existing = supabase_client.table('portfolio').select('id').eq('ticker', ticker).execute()
+        existing = get_supabase().table('portfolio').select('id').eq('ticker', ticker).execute()
         if existing.data:
             return jsonify({'message': f'{ticker} already in portfolio'})
-        supabase_client.table('portfolio').insert({
+        get_supabase().table('portfolio').insert({
             'ticker': data.get('ticker'),
             'name': data.get('name'),
             'sector': data.get('sector'),
@@ -1057,14 +1063,14 @@ def add_to_supabase_portfolio():
 
 @app.route('/api/supabase-portfolio/remove', methods=['DELETE'])
 def remove_from_supabase_portfolio():
-    if not supabase_client:
+    if not get_supabase():
         return jsonify({'error': 'Supabase not configured'}), 500
     data = request.get_json()
     ticker = data.get('ticker')
     if not ticker:
         return jsonify({'error': 'Ticker required'}), 400
     try:
-        supabase_client.table('portfolio').delete().eq('ticker', ticker).execute()
+        get_supabase().table('portfolio').delete().eq('ticker', ticker).execute()
         return jsonify({'success': True, 'message': f'{ticker} removed from portfolio'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1077,7 +1083,7 @@ def analyze_stock(ticker):
     if is_rate_limited(ip):
         return jsonify({'error': 'Rate limit reached. Maximum 10 analyses per hour per user.'}), 429
 
-    if not supabase_client:
+    if not get_supabase():
         return jsonify({'error': 'Supabase not configured'}), 500
 
     data = request.get_json() or {}
@@ -1088,7 +1094,7 @@ def analyze_stock(ticker):
     try:
         from agents.router import run_valuation
         result = run_valuation(ticker, company_name, classification, primary_reason)
-        supabase_client.table('valuations').upsert({
+        get_supabase().table('valuations').upsert({
             'ticker': ticker,
             'classification': result['classification'],
             'report': result['report'],
@@ -1106,10 +1112,10 @@ def analyze_stock(ticker):
 @app.route('/api/valuation/<ticker>', methods=['GET'])
 def get_valuation(ticker):
     """Get saved valuation for a ticker from Supabase"""
-    if not supabase_client:
+    if not get_supabase():
         return jsonify({'error': 'Supabase not configured'}), 500
     try:
-        result = supabase_client.table('valuations').select('*').eq('ticker', ticker).order('created_at', desc=True).limit(1).execute()
+        result = get_supabase().table('valuations').select('*').eq('ticker', ticker).order('created_at', desc=True).limit(1).execute()
         if result.data:
             return jsonify({'valuation': result.data[0]})
         return jsonify({'valuation': None})
