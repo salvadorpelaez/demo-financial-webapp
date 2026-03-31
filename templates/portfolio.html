@@ -649,7 +649,7 @@
 
         async function analyzeStock(ticker) {
             const stock = portfolioMap[ticker] || stockMap[ticker] || {ticker};
-            showToast(`Starting AI classification for ${ticker}... (~30 seconds)`);
+            showToast(`Starting AI classification for ${ticker}... (~60 seconds)`);
 
             // Check for cached result
             const existing = await fetch(`/api/valuation/${ticker}`);
@@ -663,7 +663,7 @@
             // Trigger new analysis
             document.getElementById('valuationPanel').style.display = 'block';
             document.getElementById('valuationTicker').textContent = ticker;
-            document.getElementById('valuationContent').textContent = 'AI model running classification... this takes ~30 seconds.';
+            document.getElementById('valuationContent').textContent = 'AI model running classification... this takes ~60 seconds.';
             document.getElementById('signalBadge').textContent = '';
             document.getElementById('signalBadge').className = 'signal-badge';
 
