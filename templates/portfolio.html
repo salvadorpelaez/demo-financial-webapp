@@ -71,10 +71,8 @@
         /* ── Market Tabs ── */
         .market-section {
             background: white;
-            border-radius: 12px;
             padding: 16px 20px 12px 20px;
-            margin-bottom: 12px;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            border-bottom: 1px solid #e9ecef;
         }
         .market-tab-bar {
             display: flex;
@@ -474,8 +472,24 @@
         </div>
     </div>
 
-    <!-- Market Tabs Section (MCP-powered) -->
-    <div class="container" style="margin-bottom:0;border-radius:12px 12px 0 0;">
+    <div class="container">
+        <div class="disclaimer">
+            <div class="disclaimer-title">⚡ AI Classification Model — Educational Demo - Not Investment Advice</div>
+            <div class="disclaimer-body">
+                This application uses an AI model to classify historical stock data into directional signals (POSITIVE / NEUTRAL / NEGATIVE).
+                It is a demonstration of machine learning applied to public market data.
+                <strong style="color:#fff"> This is not financial advice. Do not make investment decisions based on this tool.</strong>
+            </div>
+        </div>
+
+        <header>
+            <div>
+                <h1>Financial Analytics — List & AI Signal Classification</h1>
+                <p>Select VALUE or HYPERGROWTH stocks · Add to list · Run AI classification model</p>
+            </div>
+        </header>
+
+        <!-- Market Tabs Section (MCP-powered) -->
         <div class="market-section">
             <div class="market-tab-bar" id="marketTabBar">
                 <button class="market-tab-btn active" onclick="switchMarketTab('US')">US</button>
@@ -494,24 +508,6 @@
             </div>
             <div class="market-powered-by">Powered by financial-app-mcp-server → yfinance</div>
         </div>
-    </div>
-
-    <div class="container">
-        <div class="disclaimer">
-            <div class="disclaimer-title">⚡ AI Classification Model — Educational Demo - Not Investment Advice</div>
-            <div class="disclaimer-body">
-                This application uses an AI model to classify historical stock data into directional signals (POSITIVE / NEUTRAL / NEGATIVE).
-                It is a demonstration of machine learning applied to public market data.
-                <strong style="color:#fff"> This is not financial advice. Do not make investment decisions based on this tool.</strong>
-            </div>
-        </div>
-
-        <header>
-            <div>
-                <h1>Financial Analytics — List & AI Signal Classification</h1>
-                <p>Select VALUE or HYPERGROWTH stocks · Add to list · Run AI classification model</p>
-            </div>
-        </header>
 
         <span class="swipe-hint">← Swipe to review list →</span>
         <div class="layout">
