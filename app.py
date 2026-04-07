@@ -135,6 +135,42 @@ def index_selector_page():
 def test_page():
     return render_template('test_classification.html')
 
+# Tab definitions: name, ticker, format type
+_MARKET_TABS = {
+    "US":     {"format": "index",   "tickers": [("S&P 500","^GSPC"),("NASDAQ","^IXIC"),("Dow Jones","^DJI")]},
+    "OIL":    {"format": "price",   "tickers": [("Crude Oil","CL=F"),("Brent","BZ=F")]},
+    "BONDS":  {"format": "percent", "tickers": [("2Y Treasury","^IRX"),("5Y Treasury","^FVX"),("10Y Treasury","^TNX"),("30Y Treasury","^TYX")]},
+    "ASIA":   {"format": "index",   "tickers": [("Nikkei 225","^N225"),("Hang Seng","^HSI"),("ASX 200","^AXJO")]},
+    "EUR":    {"format": "index",   "tickers": [("CAC 40","^FCHI"),("FTSE 100","^FTSE"),("DAX","^GDAXI")]},
+    "METALS": {"format": "price",   "tickers": [("Gold","GC=F"),("Silver","SI=F"),("Copper","HG=F"),("Platinum","PL=F"),("Palladium","PA=F")]},
+    "CRYPTO": {"format": "price",   "tickers": [("Bitcoin","BTC-USD"),("Ethereum","ETH-USD"),("Solana","SOL-USD"),("Dogecoin","DOGE-USD"),("XRP","XRP-USD")]},
+    "FX":     {"format": "fx",      "tickers": [("EUR/USD","EURUSD=X"),("USD/JPY","JPY=X"),("GBP/USD","GBPUSD=X"),("AUD/USD","AUDUSD=X"),("USD/CAD","CAD=X")]},
+}
+
+@app.route('/api/market-tab')
+def get_market_tab():
+    """Lazy-load market data for a single tab via MCP server."""
+    tab = request.args.get('tab', 'US').upper()
+    if tab not in _MARKET_TABS:
+        return jsonify({'error': f'Unknown tab: {tab}'}), 400
+
+    tab_cfg = _MARKET_TABS[tab]
+    results = []
+    for name, symbol in tab_cfg['tickers']:
+        price_info = mcp_client.get_current_price(symbol)
+        if 'error' in price_info:
+            results.append({'name': name, 'symbol': symbol, 'price': None, 'change': 0, 'change_percent': 0})
+        else:
+            results.append({
+                'name': name, 'symbol': symbol,
+                'price': price_info['price'],
+                'change': price_info['change'],
+                'change_percent': price_info['change_percent'],
+            })
+
+    return jsonify({'tab': tab, 'format': tab_cfg['format'], 'data': results})
+
+
 @app.route('/api/market-data')
 def get_market_data():
     try:

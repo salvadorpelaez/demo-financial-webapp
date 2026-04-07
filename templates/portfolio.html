@@ -68,6 +68,77 @@
         }
         .panel:last-child { border-right: none; }
 
+        /* ── Market Tabs ── */
+        .market-section {
+            background: white;
+            border-radius: 12px;
+            padding: 16px 20px 12px 20px;
+            margin-bottom: 12px;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+        }
+        .market-tab-bar {
+            display: flex;
+            gap: 4px;
+            border-bottom: 2px solid #e9ecef;
+            margin-bottom: 14px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+        }
+        .market-tab-bar::-webkit-scrollbar { display: none; }
+        .market-tab-btn {
+            flex: 0 0 auto;
+            padding: 7px 14px;
+            border: none;
+            background: none;
+            font-size: 12px;
+            font-weight: 600;
+            color: #6c757d;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            transition: all 0.2s;
+            border-radius: 4px 4px 0 0;
+            white-space: nowrap;
+        }
+        .market-tab-btn:hover { color: #667eea; background: rgba(102,126,234,0.05); }
+        .market-tab-btn.active { color: #667eea; border-bottom-color: #667eea; }
+        .market-cards-wrapper { position: relative; }
+        .market-cards-wrapper::after {
+            content: '';
+            position: absolute;
+            top: 0; right: 0;
+            width: 28px; height: 100%;
+            background: linear-gradient(to right, transparent, white);
+            pointer-events: none;
+        }
+        .market-cards-row {
+            display: flex;
+            gap: 10px;
+            flex-wrap: nowrap;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none;
+            padding: 4px 0 8px 0;
+        }
+        .market-cards-row::-webkit-scrollbar { display: none; }
+        .market-card {
+            flex: 0 0 110px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 10px 6px;
+            text-align: center;
+            border: 1px solid #e9ecef;
+        }
+        .market-card-name { font-size: 10px; color: #6c757d; font-weight: 600; margin-bottom: 4px; }
+        .market-card-price { font-size: 16px; font-weight: 700; color: #2c3e50; margin-bottom: 3px; }
+        .market-card-change { font-size: 10px; font-weight: 600; }
+        .market-card-change.positive { color: #28a745; }
+        .market-card-change.negative { color: #dc3545; }
+        .market-cards-loading { font-size: 12px; color: #aaa; padding: 12px 0; }
+        .market-powered-by { font-size: 10px; color: #aaa; text-align: right; margin-top: 6px; font-style: italic; }
+
         /* ── Mobile: horizontal swipe between panels ── */
         @media (max-width: 768px) {
             body { padding: 10px; }
@@ -403,6 +474,28 @@
         </div>
     </div>
 
+    <!-- Market Tabs Section (MCP-powered) -->
+    <div class="container" style="margin-bottom:0;border-radius:12px 12px 0 0;">
+        <div class="market-section">
+            <div class="market-tab-bar" id="marketTabBar">
+                <button class="market-tab-btn active" onclick="switchMarketTab('US')">US</button>
+                <button class="market-tab-btn" onclick="switchMarketTab('OIL')">OIL</button>
+                <button class="market-tab-btn" onclick="switchMarketTab('BONDS')">BONDS</button>
+                <button class="market-tab-btn" onclick="switchMarketTab('ASIA')">ASIA</button>
+                <button class="market-tab-btn" onclick="switchMarketTab('EUR')">EUR</button>
+                <button class="market-tab-btn" onclick="switchMarketTab('METALS')">METALS</button>
+                <button class="market-tab-btn" onclick="switchMarketTab('CRYPTO')">CRYPTO</button>
+                <button class="market-tab-btn" onclick="switchMarketTab('FX')">FX</button>
+            </div>
+            <div class="market-cards-wrapper">
+                <div class="market-cards-row" id="marketCardsRow">
+                    <div class="market-cards-loading">Loading market data via MCP server...</div>
+                </div>
+            </div>
+            <div class="market-powered-by">Powered by financial-app-mcp-server → yfinance</div>
+        </div>
+    </div>
+
     <div class="container">
         <div class="disclaimer">
             <div class="disclaimer-title">⚡ AI Classification Model — Educational Demo - Not Investment Advice</div>
@@ -475,6 +568,75 @@
     <div class="toast" id="toast"></div>
 
     <script>
+        // ── Market Tabs (MCP-powered) ─────────────────────────────────────
+        let activeMarketTab = 'US';
+        const marketTabCache = {};  // tab -> data (avoids re-fetching)
+
+        async function switchMarketTab(tab) {
+            activeMarketTab = tab;
+
+            // Update button styles
+            document.querySelectorAll('.market-tab-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.textContent === tab);
+            });
+
+            // Show cached data instantly if available
+            if (marketTabCache[tab]) {
+                renderMarketCards(marketTabCache[tab]);
+                return;
+            }
+
+            // Otherwise fetch from Flask → MCP server
+            document.getElementById('marketCardsRow').innerHTML =
+                '<div class="market-cards-loading">Fetching ' + tab + ' data via MCP...</div>';
+
+            try {
+                const resp = await fetch('/api/market-tab?tab=' + tab);
+                const json = await resp.json();
+                marketTabCache[tab] = json;
+                renderMarketCards(json);
+            } catch (e) {
+                document.getElementById('marketCardsRow').innerHTML =
+                    '<div class="market-cards-loading">Error loading data</div>';
+            }
+        }
+
+        function formatPrice(price, fmt) {
+            if (price === null || price === undefined) return 'N/A';
+            const n = parseFloat(price);
+            if (isNaN(n)) return 'N/A';
+            if (fmt === 'percent') return n.toFixed(2) + '%';
+            if (fmt === 'fx')     return n.toFixed(4);
+            if (fmt === 'price')  return '$' + n.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+            // index
+            return n.toLocaleString('en-US', {minimumFractionDigits:0, maximumFractionDigits:0});
+        }
+
+        function renderMarketCards(data) {
+            const row = document.getElementById('marketCardsRow');
+            if (!data || !data.data || data.data.length === 0) {
+                row.innerHTML = '<div class="market-cards-loading">No data available</div>';
+                return;
+            }
+            const fmt = data.format;
+            row.innerHTML = data.data.map(item => {
+                const priceStr = formatPrice(item.price, fmt);
+                const chgPct   = parseFloat(item.change_percent) || 0;
+                const chgCls   = chgPct >= 0 ? 'positive' : 'negative';
+                const chgSign  = chgPct >= 0 ? '+' : '';
+                const chgStr   = item.price === null ? '—' : `${chgSign}${chgPct.toFixed(2)}%`;
+                return `<div class="market-card">
+                    <div class="market-card-name">${item.name}</div>
+                    <div class="market-card-price">${priceStr}</div>
+                    <div class="market-card-change ${item.price !== null ? chgCls : ''}">${chgStr}</div>
+                </div>`;
+            }).join('');
+        }
+
+        // Load US tab on page load
+        window.addEventListener('load', () => switchMarketTab('US'));
+        // ─────────────────────────────────────────────────────────────────
+
         let allStocks = [];
         let stockMap = {};
         let portfolioMap = {};
