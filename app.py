@@ -8,6 +8,7 @@ from collections import defaultdict
 from technical_indicators import indicators_bp
 # supabase and run_valuation imported lazily to reduce cold start time
 from dotenv import load_dotenv
+import mcp_client  # Financial Data MCP Server client
 
 load_dotenv()
 
@@ -152,83 +153,22 @@ def get_market_data():
             ("DAX", "^GDAXI")
         ]
         
-        # Get all indices using yfinance (supports European markets)
-        import yfinance as yf
-        import pandas as pd
-        all_tickers = [symbol for name, symbol in ordered_indices]
-        data = yf.download(all_tickers, period='2d', interval='1d')
-        
-        ticker_names = {
-            '^DJI': 'Dow Jones',
-            '^GSPC': 'S&P 500', 
-            '^IXIC': 'NASDAQ',
-            '^TNX': '10Y Treasury',
-            'CL=F': 'Crude Oil',
-            '^N225': 'Nikkei 225',
-            '^HSI': 'Hang Seng',
-            '^AXJO': 'ASX 200',
-            '^FCHI': 'CAC 40',
-            '^FTSE': 'FTSE 100',
-            '^GDAXI': 'DAX'
-        }
-        
+        # Get all indices via MCP server
         latest_data = {}
-        
         for name, symbol in ordered_indices:
             try:
-                if symbol in data['Close'].columns:
-                    close_prices = data['Close'][symbol].dropna()
-                    if len(close_prices) == 0:
-                        continue
-                        
-                    latest_price = close_prices.iloc[-1]
-                    
-                    # Get previous price for change calculation
-                    if len(close_prices) > 1:
-                        previous_price = close_prices.iloc[-2]
-                    else:
-                        # If no previous data, use open price
-                        if symbol in data['Open'].columns:
-                            open_prices = data['Open'][symbol].dropna()
-                            if len(open_prices) > 0:
-                                previous_price = open_prices.iloc[-1]
-                            else:
-                                previous_price = latest_price
-                        else:
-                            previous_price = latest_price
-                    
-                    # Handle NaN values
-                    if pd.isna(latest_price) or pd.isna(previous_price) or previous_price == 0:
-                        latest_price = 0  # Default to 0 if no data
-                        previous_price = 0
-                        change = 0
-                        change_percent = 0
-                    else:
-                        change = latest_price - previous_price
-                        change_percent = (change / previous_price * 100)
-                    
-                    latest_data[symbol] = {
-                        'name': name,
-                        'price': round(float(latest_price), 2) if latest_price != 0 else 'N/A',
-                        'change': round(float(change), 2),
-                        'change_percent': round(float(change_percent), 2)
-                    }
+                price_info = mcp_client.get_current_price(symbol)
+                if "error" in price_info:
+                    latest_data[symbol] = {'name': name, 'price': 'N/A', 'change': 0, 'change_percent': 0}
                 else:
-                    # If ticker not found, add placeholder
                     latest_data[symbol] = {
                         'name': name,
-                        'price': 'N/A',
-                        'change': 0,
-                        'change_percent': 0
+                        'price': price_info['price'],
+                        'change': price_info['change'],
+                        'change_percent': price_info['change_percent'],
                     }
-            except Exception as ticker_error:
-                # Add placeholder for failed ticker
-                latest_data[symbol] = {
-                    'name': name,
-                    'price': 'Error',
-                    'change': 0,
-                    'change_percent': 0
-                }
+            except Exception:
+                latest_data[symbol] = {'name': name, 'price': 'Error', 'change': 0, 'change_percent': 0}
         
         # Create ordered response based on the defined order
         ordered_data = {}
@@ -651,26 +591,17 @@ def get_stock_prices():
     if not tickers:
         return jsonify({'error': 'No tickers provided'}), 400
 
-    import yfinance as yf
     prices = {}
     for ticker in tickers:
-        try:
-            t = yf.Ticker(ticker)
-            hist = t.history(period='2d')
-            if not hist.empty and len(hist) >= 1:
-                current_price = float(hist['Close'].iloc[-1])
-                previous_close = float(hist['Close'].iloc[-2]) if len(hist) >= 2 else current_price
-                change = current_price - previous_close
-                change_percent = (change / previous_close * 100) if previous_close != 0 else 0
-                prices[ticker] = {
-                    'price': round(current_price, 2),
-                    'change': round(change, 2),
-                    'change_percent': round(change_percent, 2)
-                }
-            else:
-                prices[ticker] = {'price': 'N/A', 'change': 0, 'change_percent': 0}
-        except Exception:
+        price_info = mcp_client.get_current_price(ticker)
+        if "error" in price_info:
             prices[ticker] = {'price': 'N/A', 'change': 0, 'change_percent': 0}
+        else:
+            prices[ticker] = {
+                'price': price_info['price'],
+                'change': price_info['change'],
+                'change_percent': price_info['change_percent'],
+            }
 
     return jsonify(prices)
 
@@ -933,57 +864,41 @@ def get_stock_data():
         return jsonify({'error': 'Ticker parameter is required'}), 400
     
     try:
-        import yfinance as yf
-        
-        # Map timeframe to yfinance period
+        # Map timeframe to MCP server period
         period_map = {
             '1d': '1d',
-            '1w': '5d',    # 5 trading days for 1 week
+            '1w': '5d',
             '1m': '1mo',
             '3m': '3mo',
             '1y': '1y'
         }
-        
         period = period_map.get(timeframe, '5d')
-        
-        # Fetch stock data
-        stock = yf.Ticker(ticker)
-        
-        # Get historical data
-        hist = stock.history(period=period, interval='1d')
-        
-        if hist.empty:
+
+        # Fetch chart history via MCP server
+        hist_data = mcp_client.get_market_data(ticker, period=period)
+        if "error" in hist_data:
+            return jsonify({'error': hist_data['error']}), 404
+
+        rows = hist_data.get("data", {})
+        if not rows:
             return jsonify({'error': 'No data found for this ticker'}), 404
-        
-        # Get current price info
-        current_data = stock.history(period='2d', interval='1d')
-        
-        if len(current_data) < 2:
-            prev_close = current_data['Close'].iloc[-1]
-        else:
-            prev_close = current_data['Close'].iloc[-2]
-        
-        current_price = current_data['Close'].iloc[-1]
-        change = current_price - prev_close
-        change_percent = (change / prev_close) * 100 if prev_close != 0 else 0
-        
-        # Prepare data for chart
-        labels = []
-        prices = []
-        
-        for date, row in hist.iterrows():
-            labels.append(date.strftime('%Y-%m-%d'))
-            prices.append(float(row['Close']))
-        
-        # Get volume
-        volume = current_data['Volume'].iloc[-1] if not current_data.empty else None
-        
+
+        dates  = sorted(rows.keys())
+        labels = dates
+        prices = [round(float(rows[d]["Close"]), 2) for d in dates]
+
+        # Current price + change via MCP convenience helper
+        price_info = mcp_client.get_current_price(ticker)
+        current_price  = price_info.get("price", prices[-1])
+        change         = price_info.get("change", 0)
+        change_percent = price_info.get("change_percent", 0)
+
         return jsonify({
             'ticker': ticker,
-            'current_price': float(current_price),
-            'change': float(change),
-            'change_percent': float(change_percent),
-            'volume': int(volume) if volume else None,
+            'current_price': current_price,
+            'change': change,
+            'change_percent': change_percent,
+            'volume': None,
             'labels': labels,
             'prices': prices
         })
