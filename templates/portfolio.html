@@ -135,7 +135,7 @@
         .market-card-change.positive { color: #28a745; }
         .market-card-change.negative { color: #dc3545; }
         .market-cards-loading { font-size: 12px; color: #aaa; padding: 12px 0; }
-        .market-powered-by { font-size: 10px; color: #aaa; text-align: right; margin-top: 6px; font-style: italic; }
+        .market-powered-by { font-size: 10px; color: #aaa; margin-top: 6px; font-style: italic; display: flex; justify-content: space-between; }
 
         /* ── Mobile: horizontal swipe between panels ── */
         @media (max-width: 768px) {
@@ -506,7 +506,10 @@
                     <div class="market-cards-loading">Loading market data via MCP server...</div>
                 </div>
             </div>
-            <div class="market-powered-by">Powered by financial-app-mcp-server → yfinance</div>
+            <div class="market-powered-by">
+                <span>Crafted with Claude Code 🤖 — Anthropic AI</span>
+                <span>Powered by financial-app-mcp-server → yfinance</span>
+            </div>
         </div>
 
         <span class="swipe-hint">← Swipe to review list →</span>
