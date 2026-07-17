@@ -35,7 +35,8 @@ def get_supabase():
     if _supabase_instance is None:
         from supabase import create_client
         url = os.getenv("SUPABASE_URL")
-        key = os.getenv("SUPABASE_KEY")
+        # Prefer service role key for server-side RLS bypass; fall back to anon key
+        key = os.getenv("SUPABASE_SERVICE_KEY") or os.getenv("SUPABASE_KEY")
         _supabase_instance = create_client(url, key) if url and key else False
     return _supabase_instance or None
 
