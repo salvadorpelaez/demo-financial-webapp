@@ -1,7 +1,26 @@
+# PINNED 2026-08-17. Only flask was pinned before; everything else used `>=`,
+# which floats to latest on every build. This repo has been dormant since around
+# April, so the next push would have pulled four months of drift across anthropic,
+# supabase, pandas and yfinance in one rebuild — with no way to tell which one
+# broke it. A sibling service went down exactly this way on 2026-08-16, when an
+# unpinned dependency resolved to a new major that had removed a module the code
+# imported.
+#
+# werkzeug is listed even though nothing imports it directly: flask 2.3.3 is a
+# 2023 release whose own core dependency was floating free, so an upstream
+# werkzeug could break the exact flask version pinned to stop things changing.
+# Same hole was found and closed in the Valerius requirements.
+#
+# Versions mirror sp500-database-webapp, the sibling Flask app running the same
+# libraries on the same platform, where they are verified in production.
+# Remaining transitive deps are deliberately left floating — hand-pinning a
+# partial tree is how requirements become unsolvable. A lockfile is the answer if
+# this needs to go further.
 flask==2.3.3
-yfinance>=0.2.40
-pandas>=2.0.0
-requests>=2.31.0
-anthropic>=0.86.0
-supabase>=2.0.0
-python-dotenv>=1.0.0
+werkzeug==3.1.8
+yfinance==1.5.2
+pandas==3.0.5
+requests==2.34.2
+anthropic==0.120.2
+supabase==2.31.0
+python-dotenv==1.2.2
