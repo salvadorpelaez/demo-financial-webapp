@@ -45,6 +45,66 @@ app = Flask(__name__)
 # Register technical indicators blueprint
 app.register_blueprint(indicators_bp)
 
+
+def _commit_sha():
+    """The commit this process is actually running.
+
+    Exists so a deploy can be verified from outside: push, then poll /api/health
+    until `sha` matches the commit you pushed. Every other route returns a page or
+    data that looks the same before and after a deploy, so without this there is
+    no way to tell a finished deploy from a stale one — or from a build that
+    failed and left the previous version serving.
+
+    Vercel injects VERCEL_GIT_COMMIT_SHA when it builds from the connected repo.
+    Running locally it is unset, so fall back to reading .git directly. Read the
+    ref files rather than shelling out to git: the serverless bundle ships neither
+    .git nor a git binary, so the fallback is for local use only and must not
+    depend on a subprocess.
+
+    Resolved once at import — the answer cannot change without a new process.
+    """
+    for var in ('VERCEL_GIT_COMMIT_SHA', 'GIT_COMMIT_SHA', 'SOURCE_COMMIT'):
+        sha = (os.environ.get(var) or '').strip()
+        if sha:
+            return sha
+
+    git = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.git')
+    try:
+        with open(os.path.join(git, 'HEAD')) as fh:
+            head = fh.read().strip()
+        if not head.startswith('ref:'):
+            return head or None          # detached HEAD holds the sha itself
+        ref = head.split(' ', 1)[1].strip()
+
+        loose = os.path.join(git, *ref.split('/'))
+        if os.path.exists(loose):
+            with open(loose) as fh:
+                return fh.read().strip() or None
+
+        # A freshly cloned repo has no loose ref file — the branch tip lives in
+        # packed-refs until something writes to it.
+        with open(os.path.join(git, 'packed-refs')) as fh:
+            for line in fh:
+                parts = line.split()
+                if len(parts) == 2 and parts[1] == ref:
+                    return parts[0]
+    except (OSError, IndexError):
+        pass
+    return None
+
+
+COMMIT_SHA = _commit_sha()
+
+
+@app.route('/api/health')
+def health():
+    """Returns nothing about configuration: no env values, no keys, no database
+    state. `sha` is null rather than absent when it cannot be resolved, so a
+    caller comparing against a known commit fails loudly instead of matching
+    nothing. Deliberately does not touch SQLite or Supabase — a health check that
+    can fail for reasons unrelated to the deploy is worse than none."""
+    return jsonify(ok=True, ts=int(time.time()), sha=COMMIT_SHA)
+
 # Add Alpha Vantage API key - Replace with your actual API key
 # Get free key from: https://www.alphavantage.co/support/#api-key
 ALPHA_VANTAGE_API_KEY = os.environ.get('ALPHA_VANTAGE_API_KEY', 'demo')  # Use 'demo' for testing
